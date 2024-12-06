@@ -1,21 +1,21 @@
 module MarcIntegralArrays
 
+struct IntegralArray{T,N}
+    arr::AbstractArray{T,N}
+end
+
 include("IntegralArrays.jl"); 
+include("IntegralSums.jl"); 
 include("IntegralArrays_extra.jl")
+
+# local filters implemented with integral arrays
 include("local_sum_operations.jl")
 include("local_extrema.jl")
 include("local_L2.jl");
 
 export integralArray, getIntegralArray
 
-greet() = print("Hello World!")
 
-# Wrapping integral array in the "IntegralArray" type.
-struct IntegralArray{T,N}
-    arr::AbstractArray{T,N}
-end
-
-# Creating an integral array object from an input array (2D or 3D)
 function getIntegralArray( input::AbstractArray{T,N}
                          ) where {T<:AbstractFloat,N}
     intA = IntegralArray{T,N}( zeros( T, size(input) .+ 1 ) );
@@ -29,10 +29,23 @@ Base.axes(A::IntegralArray) = axes(A.arr);
 Base.lastindex(A::IntegralArray) = A.arr[size(A)...]
 
 #=
-     Similar to IntegralArrays.jl, it is very handy to define a getindex
-     that computed integral sums behind the scenes. unlike IntegralArrays.jl, 
-     I am very much against the idea of using ClosedIntervals or any extenal
-     data types or external notation.
+     Inspired by IntegralArrays.jl, I find it very handy to define a "getindex"
+    that computes integral sums behind the scenes. 
+    
+    However, unlike IntegralArrays.jl, I am very much against the idea of
+    using ClosedIntervals or any extenal data types for this. This is very
+    common in Julia (specializing for highly specific types), which requires 
+    developers to become familiar with the whole ecosystem of packages in a
+    particular field.
+    
+    Instead, I opted for overriding the use of UnitRanges with my integral 
+    arrays to express integral sums within the ROI defined by the rages. For
+    instance, `intA[ 2:10, 4:8 ]` will compute the integral sum within the 
+    rectangle from the top-left corner (2,4) to the bottom-right corner (10,8).
+    
+    In addition, I introduce the tuples as indices, to indicate the corners
+    of the ROI of interest to compute sums. For instance, `intA[ (2,4), (10,8) ]`
+    is equivalent to the above example, `intA[ 2:10, 4:8 ]`. 
 =#
 
 # intA[ 10 ] -> linear index 10
@@ -41,8 +54,14 @@ Base.@propagate_inbounds Base.getindex(A::IntegralArray, i::Int) = A.arr[i]
 # intA[ 1, 3 ] -> cartesian index (1,3)
 Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,N}, i::Vararg{Int,N}) where {T,N} = A.arr[i...]
 
+# intA[ 3, 10 ] -> integral sum within the ROI ( 3:10 ) 
+Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,1}, L::Int, R::Int ) where {T} = integralSum( A.arr, L, R ) 
+
 # intA[ (4,5), (8,9) ] -> integral sum within the ROI ( 4:8, 5:9 ) 
 Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,N}, TLF::NTuple{N,Int}, BRB::NTuple{N,Int}) where {T,N} = integralSum( A.arr, TLF, BRB ) 
+
+# intA[ 4:8 ] -> integral sum within the ROI ( 4:8 )
+Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,1}, ry::UnitRange{Int} ) where {T} = integralSum( A.arr, ry.start, ry.stop )
 
 # intA[ 4:8, 4:9 ] -> integral sum within the ROI ( 4:8, 5:9 )
 Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,2}, ry::UnitRange{Int}, rx::UnitRange{Int}) where {T} = integralSum( A.arr, (ry.start,rx.start), (ry.stop,rx.stop) )
@@ -50,6 +69,13 @@ Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,2}, ry::UnitRange{Int}
 # intA[ 4:8, 4:9, 1:10 ] -> integral sum within the ROI ( 4:8, 5:9, 1:10 )
 Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,3}, ry::UnitRange{Int}, rx::UnitRange{Int}, rz::UnitRange{Int}) where {T} = integralSum( A.arr, (ry.start,rx.start,rz.start), (ry.stop,rx.stop,rz.stop ))
 
+# super-specific class for performing integral dot products with vector fields
+# TODO: add explanation and examples
+include("IntegralVectorFields.jl")
+
+
+# multistep pipelines
+include("local_L2_segmentation.jl")
 
 end # module MarcIntegralArrays
 

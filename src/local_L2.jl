@@ -28,6 +28,41 @@ function localL2avg( img, rad )
    return ( 2 .* N .* sumIA2 .- 2 .* sumIA .* sumIA )./( N.^2 )  
 end
 
+function localL2avg!( intA::IntegralArray{T,N},
+                      intA2::IntegralArray{T,N},
+                      output::AbstractArray{T,N},
+                      rad::Dims{N} ) where {T<:AbstractFloat,N}
+
+    localL2avg!( intA.arr, intA2.arr, output, rad )
+    return nothing
+end
+
+"""
+    the sum of all L2s between all pairs of pixels in a rectangular
+    ROI is given by:
+
+    sum_ij( (p_i - p_j)^2 ) = sum_ij( p_i^2 + p_j^2 - 2p_ip_j )
+                            = Sij( p_i^2 ) + Sij( p_j^2 ) - Sij( 2p_ip_j )
+                            = NjSi( p_i^2 ) + NiSj( p_j^2 ) - 2 Sij( p_ip_j )
+
+    Nj = Ni = number of pixels in the ROI. Si( p_i^2 ) == Sj( p_j^2 ) are the
+    sum of squared values within the ROI. Sij( p_ip_j ) is the sum of pairs of
+    products between all pixels, which can be computed with Si( p_i ) * Sj( p_j ),
+    where Si(p_i) == Sj(p_j) are the sum of pixels in the ROI.
+
+    Thus, when computing the "sum of all pairs of L2s" within a ROI, most of the
+    intermediate sums are the same and they can be combined into:
+      
+        2*S(ROI.^2) - 2S(ROI)^2
+
+    When computing the "sum of all pairs of L2s" between two ROIs, the intermediate
+    sums will be different and one has to compute the extended forumula:
+
+        N2*S(ROI1.^2) + N1*S(ROI2.^2) - 2 * S(ROI1) * S(ROI2)
+
+    The average difference is obtained by dividing by the product of the number
+    of elements in both ROIS.
+"""
 function localL2avg!( intA::AbstractArray{T,N},
                       intA2::AbstractArray{T,N},
                       output::AbstractArray{T,N},
@@ -37,7 +72,7 @@ function localL2avg!( intA::AbstractArray{T,N},
     localsums!( intA, output, rad ); 
 
     # 2-. output = -2 .* sum( IA )² 
-    output .*= output
+    output .*= output;
     output .*= T(-2); 
 
     # 3-. output = 2 .* N .* sum( IA² ) - 2 .* sum( IA )²
@@ -48,9 +83,52 @@ function localL2avg!( intA::AbstractArray{T,N},
     localN_op!( output, rad, (x)->(x*x), / )
 
     return nothing
+end
 
+# TODO: implementation with two radii
+function localL2avg!( intA::AbstractArray{T,N},
+                      intA2::AbstractArray{T,N},
+                      output::AbstractArray{T,N},
+                      tmp::AbstractArray{T,N},
+                      rad1::Dims{N},
+                      rad2::Dims{N} ) where {T<:AbstractFloat,N}
+
+    @assert all( rad1 .<= rad2 )
+
+    # output = sum( out )
+    localsums!( intA, output, rad2 );
+
+    # output = sum( out ) - sum( in ) = sum( ring )
+    localsums_N_f_op!( intA, output, rad1, f=T(1), op=(out::T,res::T)->(out-res), Nop=(sum::T,n::T)->(sum) )
+
+    # output = -2*sum( ring )*sum( in )
+    localsums_N_f_op!( intA, output, rad1, f=T(-2), op=(out::T,res::T)->(out*res), Nop=(sum::T,n::T)->(sum) )
+
+    # output = Nring*sum(in^2) - 2*sum(ring)*sum(ring)
+    localsums!( intA2, tmp, rad1 )
+    localN_op!( tmp, rad1, rad2, op=(out::T,n::T)->(out*n) )
+    output .+= tmp; 
+
+    # output = Nring*sum(in^2) + Nin*sum(ring^2) - 2*sum(ring)*sum(ring)
+    localsums!( intA2, tmp, rad1, rad2 )
+    localN_op!( tmp, rad1, op=(out::T,n::T)->(out*n) )
+    output .+= tmp; 
+
+    # 4-. output = ( Nring*sum(in^2) + Nin*sum(ring^2) - 2*sum(ring)*sum(ring) )/( Nin*Nring )
+    localN_op!( output, rad1, op=(out::T,n::T)->(out/n) )
+    localN_op!( output, rad1, rad2, op=(out::T,n::T)->(out/n) )
+
+    return nothing
 end
                        
+
+
+
+
+
+
+
+
 
 # TODO: properify
 function fun_sketch( img;
