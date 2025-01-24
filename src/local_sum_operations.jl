@@ -1,144 +1,489 @@
+# NOTE: All Benchmarks below are proportional to the number of elements in the input. In other words, it is expected that computing the local sum around each voxel in a 100x100x100 volume (1 million voxels) will take much longer (100 times longer) than computing the local sum around each pixel in a 100x100 image (10 thousand pixels)
+
 ##### BOUND-SAFE LOCAL SUMS
 
-function localsums( input::AbstractArray{T,N}, 
-                    rad::Dims{N} 
-                   ) where {T<:AbstractFloat,N}
-
+function localsums( 
+    input::AbstractArray{T,N}, 
+    rad::Dims{N} 
+) where {
+    T<:AbstractFloat,
+    N
+}
     output = zeros( T, size(input));
     intA   = integralArray( input ); 
     localsums!( intA, output, rad );
     return output;
 end
 
-function localsums_N_f_op( input::AbstractArray{T,N}, 
-                           rad::Dims{N},
-                           Nop::Function=(sum::T,n::T)->(sum/n),
-                           f::T=T(1),
-                           op::Function=(out::T,res::T)->(out+res)
-                          ) where {T<:AbstractFloat,N}
-
-    output = zeros( T, size(input));
-    intA   = integralArray( input ); 
-    localsums_N_f_op!( intA, output, rad, Nop, f, op );
-    return output;
-end
-
 #= 
-NOTE: These Benchmark results should be proportional to the number of elements in the input
-
 using BenchmarkTools, MarcIntegralArrays
 
 #1D
-N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,);
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad )
+N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
   ~ 250 ns (AMD EPYC 7453)
 
 # 2D
-Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad = (5,5);
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad )
+Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad = (5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
   ~ 70.600 μs (AMD EPYC 7453)
 
 # 3D
-Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5);
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad )
+Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
    ~ 88 μs (AMD EPYC 7453)
 =#
 """ 
-    Computes in-place Local sums each each coordinate, p, of the input data. 
-    These local sums are computed from the local rectangular ROI around each
-    coordiante, p, given by `UnitRange.( p.-rad, p.+rad )`.
+    Computes in-place local sums for each coordinate, p, of the input data. These local sums are computed from the local rectangular ROI around each coordiante, p, given by `UnitRange.( p.-rad, p.+rad )`.
 """
-function localsums!( intArr::AbstractArray{T,N},
-                     output::AbstractArray{T,N},
-	                 rad::Dims{N} ) where {T,N}
-
+function localsums!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+	rad::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
     @inbounds for c in CartesianIndices( output )
-        output[ c ] = integralSum( intArr, Tuple(c) .- rad, Tuple(c) .+ rad )
+        tmp = integralSum( 
+            intArr, 
+            Tuple(c) .- rad, 
+            Tuple(c) .+ rad,
+            f 
+        )
+        output[ c ] = op( output[c], tmp ); 
     end 
     return nothing
 end
 
-# in-place Local sums in a "ring ROI" (by sustracting a small rectangle from a big rectangle).
-function localsums!( intArr::AbstractArray{T,N},
-                     output::AbstractArray{T,N},
-	                 rad_in::Dims{N},
-                     rad_out::Dims{N} ) where {T,N}
+#= 
+using BenchmarkTools, MarcIntegralArrays
 
+#1D
+N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad_in = (5,); rad_out=(10,); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad_in, $rad_out, f=$f, op=$op )
+  ~ 500 ns (AMD EPYC 7453)
+
+# 2D
+Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad_in = (5,5); rad_out=(10,10); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad_in, $rad_out, f=$f, op=$op )
+  ~ 140.600 μs (AMD EPYC 7453)
+
+# 3D
+Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad_in = (5,5,5); rad_out = (10,10,10); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad_in, $rad_out, f=$f, op=$op )
+   ~ 170 μs (AMD EPYC 7453)
+=#
+"""
+    In-place Local sums in a "ring ROI" (by sustracting a small rectangle from a big rectangle).
+"""
+function localsums!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+	rad_in::Dims{N},
+    rad_out::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
     @inbounds for c in CartesianIndices( output )
-        output[ c ] = integralSum( intArr, Tuple(c) .- rad_out, Tuple(c) .+ rad_out ) - integralSum( intArr, Tuple(c) .- rad_in, Tuple(c) .+ rad_in )
+        tmp = integralSum( 
+            intArr, 
+            Tuple(c) .- rad_out, 
+            Tuple(c) .+ rad_out,
+            f
+        )
+        tmp -= integralSum( 
+            intArr, 
+            Tuple(c) .- rad_in, 
+            Tuple(c) .+ rad_in,
+            f
+        )
+        output[ c ] = op( output[c], tmp )
     end 
     return nothing
 end
 
-# IA = rand( Float32, 50, 50 ); out = zeros( Float32, 49, 49 ); rad = (3,3); nop=*; f=Float32(1); op=+;
-# @btime MiA.localsums_N_f_op!( $IA, $out, $rad, $nop, $f, $op )
-#   122.300 μs (7205 allocations: 187.62 KiB) (BOBA server) (vs 123.000)
-#
-# IA = rand( Float32, 20, 20, 20 ); out = zeros( Float32, 19, 19, 19 ); rad = (3,3,3); nop=*; f=Float32(1); op=+;
-# @btime MiA.localsums_N_f_op!( $IA, $out, $rad, $nop, $f, $op )
-#   1.673 ms (20579 allocations: 535.91 KiB) (BOBA server) (vs 1.674.00)
-#
-# IA = rand( Float32, 20, 20, 20 ); out = zeros( Float32, 19, 19, 19 ); rad = (3,3,3); nop=(x::Float32,y::Float32)->(x*y); f=Float32(1); op=(x::Float32,y::Float32)->(x+y);
-# @btime MiA.localsums_N_f_op!( $IA, $out, $rad, $nop, $f, $op )
-#   369.800 μs (20579 allocations: 535.91 KiB) (BOBA server) 
-function localsums_N_f_op!( intArr::AbstractArray{T,N}, 
-                            output::AbstractArray{T,N}, 
-                            rad::Dims{N},
-                            Nop::Function=(sum::T,n::T)->(sum/n), 
-                            f::T=T(1),
-                            op::Function=(out::T,res::T)->(out+res) 
-                          ) where {T<:AbstractFloat,N}
+#= 
+using BenchmarkTools, MarcIntegralArrays
 
+#1D
+N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsumNs!( $IA, $output, $rad, f=$f, op=$op )
+  ~ 250 ns (AMD EPYC 7453)
+
+# 2D
+Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad = (5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsumNs!( $IA, $output, $rad, f=$f, op=$op )
+  ~ 260.600 μs (AMD EPYC 7453)
+
+# 3D
+Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localsumNs!( $IA, $output, $rad, f=$f, op=$op )
+   ~ 300 μs (AMD EPYC 7453)
+=#
+""" 
+    Computes in-place local sums * number of pixels in the rectangular local ROI.
+"""
+function localsumNs!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+	rad::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
     @inbounds for c in CartesianIndices( output )
-        output[ c ] = op( output[c], f * integralSumN( intArr, Tuple(c) .- rad, Tuple(c) .+ rad, Nop ) )
+        tmp = integralSumN( 
+            intArr, 
+            Tuple(c) .- rad, 
+            Tuple(c) .+ rad,
+            f
+        )
+        output[ c ] = op( output[c], tmp ); 
+    end 
+    return nothing
+end
+
+#= 
+using BenchmarkTools, MarcIntegralArrays
+
+#1D
+N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localAvgs!( $IA, $output, $rad, f=$f, op=$op )
+  ~ 250 ns (AMD EPYC 7453)
+
+# 2D
+Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad = (5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localAvgs!( $IA, $output, $rad, f=$f, op=$op )
+  ~ 260.600 μs (AMD EPYC 7453)
+
+# 3D
+Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
+@btime MarcIntegralArrays.localAvgs!( $IA, $output, $rad, f=$f, op=$op )
+   ~ 300 μs (AMD EPYC 7453)
+=#
+""" 
+    Computes in-place local average ( local sums / number of pixels ) in the rectangular local ROI.
+"""
+function localAvgs!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+	rad::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
+    @inbounds for c in CartesianIndices( output )
+        tmp = integralAvg( 
+            intArr, 
+            Tuple(c) .- rad, 
+            Tuple(c) .+ rad,
+            f 
+        )
+        output[ c ] = op( output[c], tmp ); 
+    end 
+    return nothing
+end
+
+function localAvgs( 
+    input::AbstractArray{T,N},
+	rad::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
+    intA = integralArray( input )
+    output = zeros( T, size(input) )
+    localAvgs!( output, intA, rad, f=f, op=op )
+    return output
+end
+
+function localAvgs!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+	rad1::Dims{N},
+	rad2::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
+    @inbounds for c in CartesianIndices( output )
+        tmp = integralAvg( 
+            intArr, 
+            Tuple(c) .- rad1, 
+            Tuple(c) .+ rad1,
+            Tuple(c) .- rad2, 
+            Tuple(c) .+ rad2,
+            f 
+        )
+        output[ c ] = op( output[c], tmp ); 
+    end 
+    return nothing
+end
+
+function localAvgs( 
+    input::AbstractArray{T,N},
+	rad1::Dims{N},
+	rad2::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
+    intA = integralArray( input )
+    output = zeros( T, size(input) )
+    localAvgs!( output, intA, rad1, rad2, f=f, op=op )
+    return output
+end
+
+"""
+   Sometimes it is desired to divide by N or multiply by N. The functions below enable that.
+""" 
+function localN( 
+    img::AbstractArray{T,N}, 
+    rad::Dims{N}
+) where {
+    T,
+    N
+}
+    output = zeros( eltype(img), size(img) );
+    localN!( output, rad )
+    return output
+end
+
+#= 
+using BenchmarkTools, MarcIntegralArrays
+
+#1D
+N = 100; T = Float32; output = zeros( T, N ); rad = (5,); f = Float32(1); op = (o::Float32,n::Float32)->(o/n)::Float32;
+@btime MarcIntegralArrays.localN!( $output, $rad, f=$f, op=$op )
+  ~ 100 ns (AMD EPYC 7453)
+
+# 2D
+Ny, Nx = 100, 100; T = Float32; output = zeros( T, Ny, Nx ); rad = (5,5); f = Float32(1); op = (o::Float32,n::Float32)->(o/n)::Float32;
+@btime MarcIntegralArrays.localN!( $output, $rad, f=$f, op=$op )
+  ~ 12.0 μs (AMD EPYC 7453)
+
+# 3D
+Ny, Nx, Nz = 20, 20, 20; T = Float32; output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5); f = Float32(1); op = (o::Float32,n::Float32)->(o/n)::Float32;
+@btime MarcIntegralArrays.localN!( $output, $rad, f=$f, op=$op )
+   ~ 53 μs (AMD EPYC 7453)
+=#
+function localN!(
+    output::AbstractArray{T,N}, 
+    rad::Dims{N};
+    f::T=T(1),
+    op=(o::T,n)->(o/n)
+) where {
+    T,
+    N
+}
+    for c in CartesianIndices( output )
+        TL = clipmin.( Tuple(c) .- rad, 1 )
+        BR = clipmax.( Tuple(c) .+ rad, size(output) ); 
+        N_ = f * T( prod( BR .- TL .+ 1 ) )
+        output[c] = op( output[c], N_ ); 
     end
     return nothing
 end
 
-function localsums_N_f_op!( intArr::AbstractArray{T,N}, 
-                            output::AbstractArray{T,N}, 
-                            rad::Dims{N};
-                            f::T=T(1),
-                            Nop::Function=(sum::T,n::T)->(sum/n), 
-                            op::Function=(out::T,res::T)->(out+res) 
-                          ) where {T<:AbstractFloat,N}
+function localN!(
+    output::AbstractArray{T,N}, 
+    rad_in::Dims{N},
+    rad_out::Dims{N};
+    f::T=T(1),
+    op=(o::T,n)->(o/n)
+) where {
+    T,
+    N
+}
+    for c in CartesianIndices( output )
+        TL   = clipmin.( Tuple(c) .- rad_in, 1 )
+        BR   = clipmax.( Tuple(c) .+ rad_in, size(output) ); 
+        N_in = f * T( prod( BR .- TL .+ 1 ) )
 
+        TL   = clipmin.( Tuple(c) .- rad_out, 1 )
+        BR   = clipmax.( Tuple(c) .+ rad_out, size(output) ); 
+        Nout = f * T( prod( BR .- TL .+ 1 ) )
+
+        output[c] = op( output[c], Nout - N_in ); 
+    end
+    return nothing
+end
+
+function localN_op!( output::AbstractArray{T,N}, 
+                     rad::Dims{N}, 
+                     Nop::Function, 
+                     Oop::Function 
+                   ) where {T<:AbstractFloat,N}
+
+    for c in CartesianIndices( output )
+        TLF = clipmin.( Tuple(c) .- rad, 1 )
+        BRB = clipmax.( Tuple(c) .+ rad, size(output) ); 
+        output[c] = Oop( output[c],  Nop( T( prod( BRB .- TLF .+ 1 ) ) )  ); 
+    end
+    return nothing
+end
+
+function localN_op!( output::AbstractArray{T,N}, 
+                     rad::Dims{N};
+                     Nop::Function=(n::T)->(n), 
+                     op::Function=(out::T,res::T)->(out*res)
+                   ) where {T<:AbstractFloat,N}
+    localN_op!( output, rad, Nop, op )
+    return nothing
+end
+
+function localN_op!( output::AbstractArray{T,N}, 
+                     rad1::Dims{N},
+                     rad2::Dims{N}, 
+                     Nop::Function=(n::T)->(n), 
+                     op::Function=(out::T,res::T)->(out*res)
+                   ) where {T<:AbstractFloat,N}
+
+    for c in CartesianIndices( output )
+        TLF1  = clipmin.( Tuple(c) .- rad1, 1 )
+        BRB1  = clipmax.( Tuple(c) .+ rad1, size(output) ); 
+        TLF2  = clipmin.( Tuple(c) .- rad2, 1 )
+        BRB2  = clipmax.( Tuple(c) .+ rad2, size(output) ); 
+        Nring = T( prod( BRB2 .- TLF2 .+ 1 ) - prod( BRB1 .- TLF1 .+ 1 ) )
+        output[c] = op( output[c],  Nop( Nring )  ); 
+    end
+    return nothing
+end
+
+function localN_op!( output::AbstractArray{T,N}, 
+                     rad1::Dims{N},
+                     rad2::Dims{N};
+                     Nop::Function=(n::T)->(n), 
+                     op::Function=(out::T,res::T)->(out*res)
+                   ) where {T<:AbstractFloat,N}
+    localN_op!( output, rad1, rad2, Nop, op )
+    return nothing
+end
+
+
+
+
+
+
+
+
+
+#= 
+using BenchmarkTools, MarcIntegralArrays
+
+#1D
+N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,); Nop=(sum::T,n::T)->(sum/n); f=T(1); op=(out::T,res::T)->(out+res);
+@btime MarcIntegralArrays.localsums_N_f_op!( $IA, $output, $rad, $Nop, $f, $op )
+  ~ 500 ns (AMD EPYC 7453)
+
+# 2D
+Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad_in = (5,5); rad_out=(10,10);
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad_in, $rad_out )
+  ~ 140.600 μs (AMD EPYC 7453)
+
+# 3D
+Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad_in = (5,5,5); rad_out = (10,10,10);
+@btime MarcIntegralArrays.localsums!( $IA, $output, $rad_in, $rad_out )
+   ~ 170 μs (AMD EPYC 7453)
+=#
+function localsums_N_f_op!( 
+    intArr::AbstractArray{T,N}, 
+    output::AbstractArray{T,N}, 
+    rad::Dims{N},
+    Nop::Function=(sum::T,n::T)->(sum/n), 
+    f::T=T(1),
+    op::Function=(out::T,res::T)->(out+res) 
+) where {
+    T<:AbstractFloat,
+    N
+}
+    @inbounds for c in CartesianIndices( output )
+        output[ c ] = op( 
+            output[c], 
+            integralSumN( 
+                intArr, 
+                Tuple(c) .- rad, 
+                Tuple(c) .+ rad, 
+                f
+            )
+        )
+    end
+    return nothing
+end
+
+function localsums_N_f_op!( 
+    intArr::AbstractArray{T,N}, 
+    output::AbstractArray{T,N}, 
+    rad::Dims{N};
+    f::T=T(1),
+    Nop::Function=(sum::T,n::T)->(sum/n), 
+    op::Function=(out::T,res::T)->(out+res) 
+) where {
+    T<:AbstractFloat,
+    N
+}
     localsums_N_f_op!( intArr, output, rad, Nop, f, op )
     return nothing
 end
 
-function localsums_N_f_op!( intArr::AbstractArray{T,N}, 
-                            output::AbstractArray{T,N}, 
-                            rad1::Dims{N},
-                            rad2::Dims{N},
-                            Nop::Function=(sum::T,n::T)->(sum/n), 
-                            f::T=T(1),
-                            op::Function=(out::T,res::T)->(out+res) 
-                          ) where {T<:AbstractFloat,N}
-
+function localsums_N_f_op!( 
+    intArr::AbstractArray{T,N}, 
+    output::AbstractArray{T,N}, 
+    rad1::Dims{N},
+    rad2::Dims{N},
+    Nop::Function=(sum::T,n::T)->(sum/n), 
+    f::T=T(1),
+    op::Function=(out::T,res::T)->(out+res) 
+) where {
+    T<:AbstractFloat,
+    N
+}
     @inbounds for c in CartesianIndices( output )
-        output[ c ] = op( output[c], f * integralSumN( intArr, Tuple(c) .- rad1, Tuple(c) .+ rad1, Tuple(c) .- rad2, Tuple(c) .+ rad2, Nop ) )
+        output[ c ] = op( 
+            output[c], 
+            f * integralSumN( 
+                intArr, 
+                Tuple(c) .- rad1, 
+                Tuple(c) .+ rad1, 
+                Tuple(c) .- rad2, 
+                Tuple(c) .+ rad2, Nop 
+            )
+        )
     end
     return nothing
 end
 
-function localsums_N_f_op!( intArr::AbstractArray{T,N}, 
-                            output::AbstractArray{T,N}, 
-                            rad1::Dims{N},
-                            rad2::Dims{N};
-                            f::T=T(1),
-                            Nop::Function=(sum::T,n::T)->(sum/n), 
-                            op::Function=(out::T,res::T)->(out+res) 
-                          ) where {T<:AbstractFloat,N}
-
+function localsums_N_f_op!( 
+    intArr::AbstractArray{T,N}, 
+    output::AbstractArray{T,N}, 
+    rad1::Dims{N},
+    rad2::Dims{N};
+    f::T=T(1),
+    Nop::Function=(sum::T,n::T)->(sum/n), 
+    op::Function=(out::T,res::T)->(out+res) 
+) where {
+    T<:AbstractFloat,
+    N
+}
     localsums_N_f_op!( intArr, output, rad1, rad2, Nop, f, op )
     return nothing
 end
-
-
-
-
-
 
 
 
@@ -270,79 +615,5 @@ function localsums_unsafe_f_op!( intArr::AbstractArray{T,3},
         output[ c ] = op( output[c], f * integralSums_unsafe( intArr, Tuple(c) .- rad, Tuple(c) .+ rad ) )
     end
 
-    return nothing
-end
-
-"""
-    Similar as the above function, but uses 'safe' integral sums
-    and includes a paramter that controls how to combine local 
-    sums and 'N'. 
-"""
-
-
-
-"""
-   Sometimes it is desired to divide by N or multiply by N. THe
-   functions below enable that.
-""" 
-
-function localN( img, rad )
-    output = zeros( eltype(img), size(img) );
-    for c in CartesianIndices( img )
-        TL = clipmin.( Tuple(c) .- rad, 1 )
-        BR = clipmax.( Tuple(c) .+ rad, size(img) ); 
-        output[c] = prod( BR .- TL .+ 1 ); 
-    end
-    return output
-end
-
-function localN_op!( output::AbstractArray{T,N}, 
-                     rad::Dims{N}, 
-                     Nop::Function, 
-                     Oop::Function 
-                   ) where {T<:AbstractFloat,N}
-
-    for c in CartesianIndices( output )
-        TLF = clipmin.( Tuple(c) .- rad, 1 )
-        BRB = clipmax.( Tuple(c) .+ rad, size(output) ); 
-        output[c] = Oop( output[c],  Nop( T( prod( BRB .- TLF .+ 1 ) ) )  ); 
-    end
-    return nothing
-end
-
-function localN_op!( output::AbstractArray{T,N}, 
-                     rad::Dims{N};
-                     Nop::Function=(n::T)->(n), 
-                     op::Function=(out::T,res::T)->(out*res)
-                   ) where {T<:AbstractFloat,N}
-    localN_op!( output, rad, Nop, op )
-    return nothing
-end
-
-function localN_op!( output::AbstractArray{T,N}, 
-                     rad1::Dims{N},
-                     rad2::Dims{N}, 
-                     Nop::Function=(n::T)->(n), 
-                     op::Function=(out::T,res::T)->(out*res)
-                   ) where {T<:AbstractFloat,N}
-
-    for c in CartesianIndices( output )
-        TLF1  = clipmin.( Tuple(c) .- rad1, 1 )
-        BRB1  = clipmax.( Tuple(c) .+ rad1, size(output) ); 
-        TLF2  = clipmin.( Tuple(c) .- rad2, 1 )
-        BRB2  = clipmax.( Tuple(c) .+ rad2, size(output) ); 
-        Nring = T( prod( BRB2 .- TLF2 .+ 1 ) - prod( BRB1 .- TLF1 .+ 1 ) )
-        output[c] = op( output[c],  Nop( Nring )  ); 
-    end
-    return nothing
-end
-
-function localN_op!( output::AbstractArray{T,N}, 
-                     rad1::Dims{N},
-                     rad2::Dims{N};
-                     Nop::Function=(n::T)->(n), 
-                     op::Function=(out::T,res::T)->(out*res)
-                   ) where {T<:AbstractFloat,N}
-    localN_op!( output, rad1, rad2, Nop, op )
     return nothing
 end

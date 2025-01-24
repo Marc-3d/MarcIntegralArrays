@@ -1,12 +1,23 @@
 module MarcIntegralArrays
 
-struct IntegralArray{T,N}
-    arr::AbstractArray{T,N}
-end
+include("integralArrays/integralArrays.jl"); 
+include("integralArrays/integralArraysL2.jl"); 
+include("integralArrays/integralArraysL2M.jl"); 
 
-include("IntegralArrays.jl"); 
-include("IntegralSums.jl"); 
-include("IntegralArrays_extra.jl")
+@inline  minmax( a::Int   , min::Int=1, max::Int=10 ) = a + (min-a)*Int(a<min) + (max-a)*Int(a>max)
+@inline  minmax( a::Dims{2}, min::Int, max::Dims{2} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ) )
+@inline  minmax( a::Dims{3}, min::Int, max::Dims{3} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ), minmax( a[3], min, max[3] ) )
+
+@inline clipmin( a::Int, min::Int=1 ) = a + (min-a)*Int(a<min)
+@inline clipmax( a::Int, max::Int=1 ) = a + (max-a)*Int(a>max) 
+
+include("integralSums/IntegralSum.jl");
+include("integralSums/IntegralSumN.jl"); 
+include("integralSums/IntegralSum_ring.jl");
+include("integralSums/IntegralSumN_ring.jl");
+
+
+include("integralArrays/IntegralArrays_extra.jl")
 
 # local filters implemented with integral arrays
 include("local_sum_operations.jl")
@@ -71,7 +82,7 @@ Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,3}, ry::UnitRange{Int}
 
 # super-specific class for performing integral dot products with vector fields
 # TODO: add explanation and examples
-include("IntegralVectorFields.jl")
+include("integralArrays/IntegralVectorFields.jl")
 
 
 # multistep pipelines

@@ -12,152 +12,449 @@
     position. This is can be computed very efficiently with two 
     integral arrays and in-place integral sums.    
 """
-function localL2avg( img, rad )
-   
-   intA  = integralArray( img ); 
-   intA2 = integralArraySQ( img ); 
-   
-   sumIA = zeros( eltype(img), size(img) ); 
-   localsums!( intA, sumIA, rad ); 
-
-   sumIA2 = zeros( eltype(img), size(img) ); 
-   localsums!( intA2, sumIA2, rad );
-
-   N = localN( img, rad ); 
-
-   return ( 2 .* N .* sumIA2 .- 2 .* sumIA .* sumIA )./( N.^2 )  
+function localL2avg( 
+    img::AbstractArray{T,N}, 
+    rad ::Dims{N}
+) where {
+    T,
+    N
+}
+   intAL2 = IntegralArraysL2( img )
+   out = localL2avg( intAL2, rad )
+   return out  
 end
 
-function localL2avg!( intA::IntegralArray{T,N},
-                      intA2::IntegralArray{T,N},
-                      output::AbstractArray{T,N},
-                      rad::Dims{N} ) where {T<:AbstractFloat,N}
+#####
 
-    localL2avg!( intA.arr, intA2.arr, output, rad )
+function localL2avg( 
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    output = zeros( T, size(intAL2.IA.arr) .- 1 ); 
+    localL2avg!( output, intAL2, rad ) 
+    return output
+end
+
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg!( output, intAL2.IA, intAL2.IA2, rad )
+    return nothing
+end
+
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intA::IntegralArray{T,N},
+    intA2::IntegralArray{T,N},
+    rad::Dims{N};
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg!( output, intA.arr, intA2.arr, rad )
     return nothing
 end
 
 """
-    the sum of all L2s between all pairs of pixels in a rectangular
-    ROI is given by:
+    The sum of all L2s between all pairs of pixels in a rectangular ROI is given by:
 
-    sum_ij( (p_i - p_j)^2 ) = sum_ij( p_i^2 + p_j^2 - 2p_ip_j )
-                            = Sij( p_i^2 ) + Sij( p_j^2 ) - Sij( 2p_ip_j )
-                            = NjSi( p_i^2 ) + NiSj( p_j^2 ) - 2 Sij( p_ip_j )
+    sum_ij( (p_i - p_j)^2 ) 
+        = sum_ij( p_i^2 + p_j^2 - 2p_ip_j )
+        = Sij( p_i^2 ) + Sij( p_j^2 ) - Sij( 2p_ip_j )
+        = NjSi( p_i^2 ) + NiSj( p_j^2 ) - 2 Sij( p_ip_j )
 
-    Nj = Ni = number of pixels in the ROI. Si( p_i^2 ) == Sj( p_j^2 ) are the
-    sum of squared values within the ROI. Sij( p_ip_j ) is the sum of pairs of
-    products between all pixels, which can be computed with Si( p_i ) * Sj( p_j ),
-    where Si(p_i) == Sj(p_j) are the sum of pixels in the ROI.
+    Nj == Ni = number of pixels in the ROI. Si( p_i^2 ) == Sj( p_j^2 ) are the sum of squared values within the ROI. Sij( p_ip_j ) is the sum of pairs of products between all pixels, which can be computed with Si( p_i ) * Sj( p_j ), where Si( p_i ) == Sj( p_j ) are the sum of pixels in the ROI.
 
-    Thus, when computing the "sum of all pairs of L2s" within a ROI, most of the
-    intermediate sums are the same and they can be combined into:
+    Thus, when computing the "sum of all pairs of L2s" within a ROI, most of the intermediate sums are the same and they can be combined into:
       
         2*S(ROI.^2) - 2S(ROI)^2
 
-    When computing the "sum of all pairs of L2s" between two ROIs, the intermediate
-    sums will be different and one has to compute the extended forumula:
+    When computing the "sum of all pairs of L2s" between two ROIs, the intermediate sums will be different and one has to compute the extended forumula:
 
         N2*S(ROI1.^2) + N1*S(ROI2.^2) - 2 * S(ROI1) * S(ROI2)
 
-    The average difference is obtained by dividing by the product of the number
-    of elements in both ROIS.
+    The average difference is obtained by dividing by the product of the number of elements in both ROIS.
 """
-function localL2avg!( intA::AbstractArray{T,N},
-                      intA2::AbstractArray{T,N},
-                      output::AbstractArray{T,N},
-                      rad::Dims{N} ) where {T<:AbstractFloat,N}
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intA::AbstractArray{T,N},
+    intA2::AbstractArray{T,N},
+    rad::Dims{N};
+    op::Function=(out::T,ret::T)->(ret*ret)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+    # 1-. output = -2 .* sum( IA )²
+    localsums!( 
+        output, 
+        intA, 
+        rad,
+        op=op
+    ); 
+    output .*= T(-2)
 
-    # 1-. output = sum( IA )
-    localsums!( intA, output, rad ); 
+    # 2-. output = 2 .* N .* sum( IA² ) - 2 .* sum( IA )²
+    localsumNs!( 
+        output, 
+        intA2, 
+        rad, 
+        f=T(2), 
+        op=+
+    )
 
-    # 2-. output = -2 .* sum( IA )² 
-    output .*= output;
-    output .*= T(-2); 
-
-    # 3-. output = 2 .* N .* sum( IA² ) - 2 .* sum( IA )²
-    # TODO: remove allocations... partially removed by converting N to Float. 
-    localsums_N_f_op!( intA2, output, rad, *, T(2), + )
-
-    # 4-. output = ( 2 .* N .* sum( IA² ) - 2 .* sum( IA )² )/( N² )
-    localN_op!( output, rad, (x)->(x*x), / )
+    # 3-. output = ( 2 .* N .* sum( IA² ) - 2 .* sum( IA )² )/( N² )
+    localN!( 
+        output, 
+        rad, 
+        op=(o::T,n::T)->(o/(n*n)) 
+    )
 
     return nothing
 end
 
 # TODO: implementation with two radii
-function localL2avg!( intA::AbstractArray{T,N},
-                      intA2::AbstractArray{T,N},
-                      output::AbstractArray{T,N},
-                      tmp::AbstractArray{T,N},
-                      rad1::Dims{N},
-                      rad2::Dims{N} ) where {T<:AbstractFloat,N}
+"""
 
-    @assert all( rad1 .<= rad2 )
+"""
 
-    # output = sum( out )
-    localsums!( intA, output, rad2 );
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intAL2::IntegralArraysL2{T,N},
+    tmp::AbstractArray{T,N},
+    rad_in::Dims{N},
+    rad_out::Dims{N};
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg!( output, intAL2.IA, intAL2.IA2, tmp, rad_in, rad_out, op=op )
+    return nothing
+end
+
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intA::IntegralArray{T,N},
+    intA2::IntegralArray{T,N},
+    tmp::AbstractArray{T,N},
+    rad_in::Dims{N},
+    rad_out::Dims{N};
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg!( output, intA.arr, intA2.arr, tmp, rad_in, rad_out, op=op )
+    return nothing
+end
+
+function localL2avg!( 
+    output::AbstractArray{T,N},
+    intA::AbstractArray{T,N},
+    intA2::AbstractArray{T,N},
+    tmp::AbstractArray{T,N},
+    rad_in::Dims{N},
+    rad_out::Dims{N}; 
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+    @assert all( rad_in .<= rad_out )
 
     # output = sum( out ) - sum( in ) = sum( ring )
-    localsums_N_f_op!( intA, output, rad1, f=T(1), op=(out::T,res::T)->(out-res), Nop=(sum::T,n::T)->(sum) )
+    localsums!( 
+        output, 
+        intA,
+        rad_in,
+        rad_out,
+        op=op
+    );
 
     # output = -2*sum( ring )*sum( in )
-    localsums_N_f_op!( intA, output, rad1, f=T(-2), op=(out::T,res::T)->(out*res), Nop=(sum::T,n::T)->(sum) )
+    localsums!( 
+        output, 
+        intA,
+        rad_in,
+        f=T(-2),
+        op=*
+    )
+    # ...
 
     # output = Nring*sum(in^2) - 2*sum(ring)*sum(ring)
-    localsums!( intA2, tmp, rad1 )
-    localN_op!( tmp, rad1, rad2, op=(out::T,n::T)->(out*n) )
+    localsums!( 
+        tmp,
+        intA2, 
+        rad_in,
+        op=op
+    )
+    localN!( 
+        tmp, 
+        rad_in, 
+        rad_out, 
+        op=(out::T,n::T)->(out*n)::T
+    )
     output .+= tmp; 
 
     # output = Nring*sum(in^2) + Nin*sum(ring^2) - 2*sum(ring)*sum(ring)
-    localsums!( intA2, tmp, rad1, rad2 )
-    localN_op!( tmp, rad1, op=(out::T,n::T)->(out*n) )
+    localsums!( 
+        tmp, 
+        intA2, 
+        rad_in, 
+        rad_out,
+        op=(o::T,r::T)->(r)::T
+    )
+    localN!( 
+        tmp, 
+        rad_in, 
+        op=(out::T,n::T)->(out*n)
+    )
     output .+= tmp; 
 
     # 4-. output = ( Nring*sum(in^2) + Nin*sum(ring^2) - 2*sum(ring)*sum(ring) )/( Nin*Nring )
-    localN_op!( output, rad1, op=(out::T,n::T)->(out/n) )
-    localN_op!( output, rad1, rad2, op=(out::T,n::T)->(out/n) )
+    localN!( 
+        output, 
+        rad_in, 
+        op=(out::T,n::T)->(out/n)
+    )
+    localN_op!( 
+        output, 
+        rad_in, 
+        rad_out, 
+        op=(out::T,n::T)->(out/n)
+    )
 
     return nothing
 end
-                       
 
+################################                       
 
-
-
-
-
-
-
-
-# TODO: properify
-function fun_sketch( img;
-                     dm=10, 
-                     r1=(5,5), 
-                     r2=(2,2),
-                     r3=(2,2),
-                     r4=(10,10),
-                     fmax=2, ovp=(0,0), f=1 )
-
-    E = local_L2avg( img, r1 ); 
-    E .*= E .> dm
-
-    mn, mx = local_extrema( E, r2, fmax=fmax, f=f ); 
-
-    mF = Float64.( mx ); 
-    vF = mF .* img;  
-    mB = Float64.( mn ); 
-    vB = mB .* img; 
-
-    # dif FB > dif BB
-    NF  = localsums( mF, r3 );
-    NB  = localsums( mB, r4 );
-    sF  = localsums( vF, r3 );
-    sB  = localsums( vB, r4 );
-    sF2 = localsums( vF.^2, r3 );
-    sB2 = localsums( vB.^2, r4 );
-    difFB = ( NB .* sF2 .+ NF .* sB2 .- 2 .* sF .* sB )./( NB.*NF )
-    difBB = ( 2 .* NB .* sB2 .- 2 .* sB .* sB )./(NB.*NB)
-
-    return mF .* ( difFB .> difBB ), E, mx, NF, NB, sF, sB, sF2, sB2, difFB, difBB
+"""   
+"""
+function localL2avg_( 
+    img::AbstractArray{T,N}, 
+    rad ::Dims{N}
+) where {
+    T,
+    N
+}
+   intAL2 = IntegralArraysL2( img )
+   out = localL2avg_( img, intAL2, rad )
+   return out  
 end
+
+#####
+
+function localL2avg_( 
+    img::AbstractArray{T,N}, 
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    output = zeros( T, size(img) ); 
+    localL2avg_!( output, img, intAL2, rad ) 
+    return output
+end
+
+function localL2avg_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg_!( output, img, intAL2.IA, intAL2.IA2, rad )
+    return nothing
+end
+
+function localL2avg_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intA::IntegralArray{T,N},
+    intA2::IntegralArray{T,N},
+    rad::Dims{N};
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localL2avg_!( output, img, intA.arr, intA2.arr, rad )
+    return nothing
+end
+
+"""
+    The sum of all L2s between all pairs of pixels in a rectangular ROI is given by:
+
+    sum_j( (I - p_j)^2 ) / Nj
+        = sum_j( I^2 + p_j^2 - 2Ip_j ) / Nj
+        = ( Sj( I^2 ) + Sj( p_j^2 ) - Sj( 2Ip_j ) ) / Nj 
+        = ( Nj( I^2 ) + Sj( p_j^2 ) - 2ISj( p_j ) ) / Nj
+        = I^2 + ( Sj( p_j^2 ) - 2ISj( p_j ) ) / Nj
+"""
+function localL2avg_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intA::AbstractArray{T,N},
+    intA2::AbstractArray{T,N},
+    rad::Dims{N};
+    op::Function=(out::T,ret::T)->(ret)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+
+    # 1-. output = -2 .* I .* sum( IA )
+    localsums!( 
+        output, 
+        intA, 
+        rad,
+        f=T(-2),
+        op=op
+    ); 
+    output .*= img
+
+    # 2-. output = sum( IA² ) - 2 .* I .* sum( IA )
+    localsums!( 
+        output, 
+        intA2, 
+        rad, 
+        op=+
+    )
+
+    # 3-. output = ( sum( IA² ) - 2 .* I .* sum( IA ) )/( N )
+    localN!( 
+        output, 
+        rad, 
+        op=(o::T,n::T)->(o/n) 
+    )
+
+    # 3-. output = I.^2 .+ ( sum( IA² ) - 2 .* I .* sum( IA )² )/( N )
+    output .+= img .^ 2
+
+    return nothing
+end
+
+################################                       
+
+"""   
+"""
+function localSTD_( 
+    img::AbstractArray{T,N}, 
+    rad ::Dims{N}
+) where {
+    T,
+    N
+}
+   intAL2 = IntegralArraysL2( img )
+   out = localSTD_( img, intAL2, rad )
+   return out  
+end
+
+#####
+
+function localSTD_( 
+    img::AbstractArray{T,N}, 
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    output = zeros( T, size(img) ); 
+    localSTD_!( output, img, intAL2, rad ) 
+    return output
+end
+
+function localSTD_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intAL2::IntegralArraysL2{T,N},
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localSTD_!( output, img, intAL2.IA, intAL2.IA2, rad )
+    return nothing
+end
+
+function localSTD_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intA::IntegralArray{T,N},
+    intA2::IntegralArray{T,N},
+    rad::Dims{N};
+) where {
+    T<:AbstractFloat,
+    N
+}
+    localSTD_!( output, img, intA.arr, intA2.arr, rad )
+    return nothing
+end
+
+"""
+    The sum of all L2s between all pairs of pixels in a rectangular ROI is given by:
+
+    sum_j( (I_j - M)^2 ) / Nj
+        = sum_j( I_j^2 + M^2 - 2MI_j ) / Nj
+        = ( Sj( I_j^2 ) + Sj( M^2 ) - Sj( 2MI_j ) ) / Nj 
+        = ( Sj( I_j^2 ) + NjSj( I_j )^2/Nj^2 - 2MSj( I_j ) ) / Nj
+        = ( Sj( I_j^2 ) + Sj( I_j )^2/Nj - 2Sj( I_j )^2/Nj ) / Nj
+        = ( Sj( I_j^2 ) - Sj( I_j )^2/Nj ) / Nj
+"""
+function localSTD_!( 
+    output::AbstractArray{T,N},
+    img::AbstractArray{T,N}, 
+    intA::AbstractArray{T,N},
+    intA2::AbstractArray{T,N},
+    rad::Dims{N};
+    op::Function=(out::T,ret::T)->(ret*ret)::T
+) where {
+    T<:AbstractFloat,
+    N
+}
+
+    # 1-. output = - sum( IA )^2 / N
+    localsums!( 
+        output, 
+        intA, 
+        rad,
+        op=op
+    ); 
+    output .*= -1
+    localN!( 
+        output, 
+        rad, 
+        op=(o::T,n::T)->(o/n) 
+    )
+
+    # 2-. output = sum( IA² ) - sum( IA )^2 / N
+    localsums!( 
+        output, 
+        intA2, 
+        rad, 
+        op=+
+    )
+
+    # 3-. output = ( sum( IA² ) - sum( IA )^2 / N )/( N )
+    localN!( 
+        output, 
+        rad, 
+        op=(o::T,n::T)->(o/n) 
+    )
+
+    return nothing
+end
+

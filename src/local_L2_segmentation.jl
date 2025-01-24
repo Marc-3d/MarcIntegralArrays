@@ -1,30 +1,50 @@
 # Taken from my experiments with tribolium castaneum
 
 """
-    This is class that holds two integral arrays for any input array.
-    Namely, it hold a "standard integral array", and a "square
-    integral array". Both of these are required to compute local L2s.
+    This class is meant two store two integral arrays for the desired input array. Namely, it hold a "standard integral array", and a "square integral array". Both of these are required to compute local L2s.
 """
 mutable struct IntegralArraysL2{T,N}
     IA::IntegralArray{T,N}
     IA2::IntegralArray{T,N}
 end
 
-function integralArraysL2( inp::AbstractArray{T,N} ) where {T,N}
-
-    IA_size = size(inp) .+ 1 
-    out = IntegralArraysL2{T,N}( IntegralArray( zeros( T, IA_size ) ), 
-                                 IntegralArray( zeros( T, IA_size ) ) )
-
-    integralArray!( out.IA, inp )
-    integralArray!( out.IA2, inp, (x)::T->(x*x) )
-
-    return out
+# default constructor
+function IntegralArraysL2( 
+    type, 
+    size::Dims{N} 
+) where {
+    N
+}
+    return IntegralArraysL2{type,N}( 
+        IntegralArray( type, size ), 
+        IntegralArray( type, size ) 
+    )
 end
 
-function integralArraysL2!( IAL2::IntegralArraysL2{T,N}, inp::AbstractArray{T,N} ) where {T,N}
+# contructor from input data
+function integralArraysL2( 
+    inp::AbstractArray{T,N} 
+) where {
+    T,
+    N
+}
+    # initializing the integral arrays within IAL2
+    IAL2 = IntegralArraysL2( T, size(inp) .+ 1 )
+    # populating the integral arrays within IAL2
+    integralArraysL2!( IAL2, inp )
 
-    integralArray!( IAL2.IA, inp )
+    return IAL2
+end
+
+# in-place computation of the two integral arrays 
+function integralArraysL2!( 
+    IAL2::IntegralArraysL2{T,N}, 
+    inp::AbstractArray{T,N} 
+) where {
+    T,
+    N
+}
+    integralArray!( IAL2.IA , inp )
     integralArray!( IAL2.IA2, inp, (x)::T->(x*x) )
     return nothing
 end
@@ -42,13 +62,17 @@ end
         avgL2 around pixel
         std of avgL2 
 """
-function local_L2_stat_segmentation( inp::AbstractArray{T,N};
-                                     avg_r::Dims{N}=Tuple(ones(Int,N)),
-                                     dif_r::Dims{N}=Tuple(ones(Int,N)),
-                                     std_r::Dims{N}=Tuple(ones(Int,N)),
-                                     avg_f=1,
-                                     std_f=1 ) where {T,N}
-
+function local_L2_stat_segmentation_og( 
+    inp::AbstractArray{T,N};
+    avg_r::Dims{N}=Tuple(ones(Int,N)),
+    dif_r::Dims{N}=Tuple(ones(Int,N)),
+    std_r::Dims{N}=Tuple(ones(Int,N)),
+    avg_f=1,
+    std_f=1 
+) where {
+    T,
+    N
+}
     IAL2 = integralArraysL2( inp  ); 
     tmp1 = zeros(  T  , size(inp) ); 
     tmp2 = zeros(  T  , size(inp) ); 
@@ -92,13 +116,17 @@ function local_L2_stat_segmentation( inp::AbstractArray{T,N};
     return tmp2
 end
 
-function local_L2_stat_segmentation( inp::AbstractArray{T,N};
-                                     avg_r::Dims{N}=Tuple(ones(Int,N)),
-                                     dif_r::Dims{N}=Tuple(ones(Int,N)),
-                                     std_r::Dims{N}=Tuple(ones(Int,N)),
-                                     avg_f=1,
-                                     std_f=1 ) where {T,N}
-
+function local_L2_stat_segmentation( 
+    inp::AbstractArray{T,N};
+    avg_r::Dims{N}=Tuple(ones(Int,N)),
+    dif_r::Dims{N}=Tuple(ones(Int,N)),
+    std_r::Dims{N}=Tuple(ones(Int,N)),
+    avg_f=1,
+    std_f=1 
+) where {
+    T,
+    N
+}
     IAL2 = integralArraysL2( inp  ); 
     tmp1 = zeros(  T  , size(inp) ); 
     tmp2 = zeros(  T  , size(inp) ); 
@@ -114,12 +142,18 @@ function local_L2_stat_segmentation( inp::AbstractArray{T,N};
 
     IAL2.IA.arr  .= 0.0
     integralArray!( IAL2.IA, tmp2 );
-    localsums_N_f_op!( IAL2.IA.arr, tmp2, std_r )
+    localsumNs!( tmp2, IAL2.IA.arr, std_r, op=(out::T,in::T)->(in)::T); 
+    #localsums_N_f_op!( IAL2.IA.arr, tmp2, std_r )
 
     return tmp1 ./ tmp2
 end
 
-function local_L2_tmp_data( inp::AbstractArray{T,N} ) where {T,N}
+function local_L2_tmp_data( 
+    inp::AbstractArray{T,N} 
+) where {
+    T,
+    N
+}
     IAL2 = integralArraysL2( inp  ); 
     tmp1 = zeros(  T  , size(inp) ); 
     tmp2 = zeros(  T  , size(inp) ); 
@@ -127,45 +161,76 @@ function local_L2_tmp_data( inp::AbstractArray{T,N} ) where {T,N}
     return IAL2, tmp1, tmp2, mask
 end
 
-function local_L2_stat_segmentation_2!( inp::AbstractArray{T,N},
-                                        IAL2::IntegralArraysL2{T,N},
-                                        tmp1::AbstractArray{T,N},
-                                        tmp2::AbstractArray{T,N},
-                                        mask::AbstractArray{Bool,N};
-                                        rad0::Dims{N}=Tuple( ones(Int,N)),
-                                        rad1::Dims{N}=Tuple(zeros(Int,N)),
-                                        rad2::Dims{N}=Tuple( ones(Int,N)),
-                                        rad3::Dims{N}=Tuple( ones(Int,N)),
-                                        rad4::Dims{N}=Tuple( ones(Int,N)),
-                                        avg_f=1,
-                                        std_f=1 ) where {T,N}
+"""
+    Local & global intensity-dfference-based segmentation
+"""
+function local_L2_stat_segmentation_2!( 
+    inp::AbstractArray{T,N},
+    IAL2::IntegralArraysL2{T,N},
+    tmp1::AbstractArray{T,N},
+    tmp2::AbstractArray{T,N},
+    mask::AbstractArray{Bool,N};
+    rad0::Dims{N}=Tuple( ones(Int,N)),
+    rad1::Dims{N}=Tuple(zeros(Int,N)),
+    rad2::Dims{N}=Tuple( ones(Int,N)),
+    rad3::Dims{N}=Tuple( ones(Int,N)),
+    rad4::Dims{N}=Tuple( ones(Int,N)),
+    avg_f=1,
+    std_f=1 
+) where {
+    T,
+    N
+}
+    # tmp1 = Local mean intensity around each pixel  (rad0)
+    localAvgs!( 
+        tmp1, 
+        IAL2.IA.arr,
+        rad0,
+        op=(out::T,res::T)->(res)
+    )
 
-    # Local & global intensity based thresholding
-
-    localsums_N_f_op!( IAL2.IA.arr, tmp1, rad0, op=(out::T,res::T)->(res), Nop=(sum::T,n::T)->(sum/n) )
+    # Global average mean intensity
     global_th = sum( tmp1 )/length( tmp1 )
 
     mask .*= inp .> tmp1
     mask .*= inp .> global_th
 
-    # Segmenting regions where the L2 difs are a larger scale (GS) are greater than the avg L2 dif at low scales (LS).
-    # This is a sign that there are structures of thickness (LS), so that locally the average L2 difs at LS are low...
-    # and the average L2 difs at the larger scale will be high.
+    # Segmenting regions where the L2 difs at a larger scale (GS) are greater than the avg L2 dif at low scales (LS). This is a sign that there are structures of thickness (LS), so that locally the average L2 difs at LS are low... and the average L2 difs at the larger scale will be high.
 
-    # tmp1 = sum of differences of pixel - ROI
+    # tmp1 = Local sum of L2 differences between pixel(rad1) - ROI(rad2)
     tmp1 .= 0.0
-    localL2avg!( IAL2.IA.arr, IAL2.IA2.arr, tmp1, tmp2, rad1, rad2 )
+    localL2avg!( 
+        IAL2.IA.arr, 
+        IAL2.IA2.arr, 
+        tmp1, 
+        tmp2, 
+        rad1, 
+        rad2 
+    )
     sqr!( tmp1 )
+
+    return nothing
 
     # tmp2 = avg(L2(I))    
     tmp2 .= 0.0
-    localL2avg!( IAL2.IA, IAL2.IA2, tmp2, rad3 )
+    localL2avg!( 
+        IAL2.IA, 
+        IAL2.IA2, 
+        tmp2, 
+        rad3 
+    )
     sqr!( tmp2 )
 
     # tmp2 = local( avg(L2(I)) )
     IAL2.IA.arr .= 0.0
     integralArray!( IAL2.IA, tmp2 );
-    localsums_N_f_op!( IAL2.IA.arr, tmp2, rad4, op=(out::T,res::T)->(res), Nop=(sum::T,n::T)->(sum/n) )
+    localsums_N_f_op!( 
+        IAL2.IA.arr, 
+        tmp2, 
+        rad4, 
+        op=(out::T,res::T)->(res), 
+        Nop=(sum::T,n::T)->(sum/n) 
+    )
 
     mask .*= ( tmp1 ./ tmp2 ) .> avg_f
 
