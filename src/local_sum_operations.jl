@@ -39,7 +39,7 @@ Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output =
 function localsums!( 
     output::AbstractArray{T,N},
     intArr::AbstractArray{T,N},
-	rad::Dims{N};
+    rad::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -82,7 +82,7 @@ Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output =
 function localsums!( 
     output::AbstractArray{T,N},
     intArr::AbstractArray{T,N},
-	rad_in::Dims{N},
+    rad_in::Dims{N},
     rad_out::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
@@ -93,14 +93,10 @@ function localsums!(
     @inbounds for c in CartesianIndices( output )
         tmp = integralSum( 
             intArr, 
+            Tuple(c) .- rad_in,
+            Tuple(c) .+ rad_in,
             Tuple(c) .- rad_out, 
             Tuple(c) .+ rad_out,
-            f
-        )
-        tmp -= integralSum( 
-            intArr, 
-            Tuple(c) .- rad_in, 
-            Tuple(c) .+ rad_in,
             f
         )
         output[ c ] = op( output[c], tmp )
@@ -132,7 +128,7 @@ Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output =
 function localsumNs!( 
     output::AbstractArray{T,N},
     intArr::AbstractArray{T,N},
-	rad::Dims{N};
+    rad::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -144,6 +140,31 @@ function localsumNs!(
             intArr, 
             Tuple(c) .- rad, 
             Tuple(c) .+ rad,
+            f
+        )
+        output[ c ] = op( output[c], tmp ); 
+    end 
+    return nothing
+end
+
+function localsumNs!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+    rad_in::Dims{N},
+    rad_out::Dims{N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(out+in)::T
+) where {
+    T,
+    N
+}
+    @inbounds for c in CartesianIndices( output )
+        tmp = integralSumN( 
+            intArr, 
+            Tuple(c) .- rad_in, 
+            Tuple(c) .+ rad_in,
+            Tuple(c) .- rad_out,
+            Tuple(c) .+ rad_out,
             f
         )
         output[ c ] = op( output[c], tmp ); 
@@ -175,7 +196,7 @@ Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output =
 function localAvgs!( 
     output::AbstractArray{T,N},
     intArr::AbstractArray{T,N},
-	rad::Dims{N};
+    rad::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -196,7 +217,7 @@ end
 
 function localAvgs( 
     input::AbstractArray{T,N},
-	rad::Dims{N};
+    rad::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -212,8 +233,8 @@ end
 function localAvgs!( 
     output::AbstractArray{T,N},
     intArr::AbstractArray{T,N},
-	rad1::Dims{N},
-	rad2::Dims{N};
+    rad1::Dims{N},
+    rad2::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -236,8 +257,8 @@ end
 
 function localAvgs( 
     input::AbstractArray{T,N},
-	rad1::Dims{N},
-	rad2::Dims{N};
+    rad1::Dims{N},
+    rad2::Dims{N};
     f::T=T(1),
     op::Function=(out::T,in::T)->(out+in)::T
 ) where {
@@ -312,13 +333,13 @@ function localN!(
     N
 }
     for c in CartesianIndices( output )
-        TL   = clipmin.( Tuple(c) .- rad_in, 1 )
-        BR   = clipmax.( Tuple(c) .+ rad_in, size(output) ); 
-        N_in = f * T( prod( BR .- TL .+ 1 ) )
+        TL1  = clipmin.( Tuple(c) .- rad_in, 1 )
+        BR1  = clipmax.( Tuple(c) .+ rad_in, size(output) ); 
+        N_in = f * T( prod( BR1 .- TL1 .+ 1 ) )
 
-        TL   = clipmin.( Tuple(c) .- rad_out, 1 )
-        BR   = clipmax.( Tuple(c) .+ rad_out, size(output) ); 
-        Nout = f * T( prod( BR .- TL .+ 1 ) )
+        TL2  = clipmin.( Tuple(c) .- rad_out, 1 )
+        BR2  = clipmax.( Tuple(c) .+ rad_out, size(output) ); 
+        Nout = f * T( prod( BR2 .- TL2 .+ 1 ) )
 
         output[c] = op( output[c], Nout - N_in ); 
     end

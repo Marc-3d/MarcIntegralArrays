@@ -16,7 +16,7 @@ function integralSumN(
     minmax.( BR1, 1, size(intArr).-1 ),
     minmax.( TL2, 1, size(intArr).-1 ), 
     minmax.( BR2, 1, size(intArr).-1 ),
-    op 
+    f
   )
 end
 
@@ -27,7 +27,9 @@ function integralSumN(
   L2::Int,
   R2::Int,
   f::T
-) where {T}
+) where {
+  T
+}
 
   return integralSumN( 
     intArr, 
@@ -35,7 +37,7 @@ function integralSumN(
     minmax( R1, 1, size(intArr,1)-1 ),
     minmax( L2, 1, size(intArr,1)-1 ), 
     minmax( R2, 1, size(intArr,1)-1 ),
-    op
+    f
   )
 end
 
@@ -85,7 +87,7 @@ function integralSumN(
   T<:AbstractFloat
 }
     @inbounds begin  
-        return f * integralSum( intArr, TL1, BR1, TL2, BR2, f ) *  T( prod( BR2 .- TL2 .+ 1 ) - prod( BR1 .- TL1 .+ 1) )
+        return integralSum( intArr, TL1, BR1, TL2, BR2, f ) *  T( prod( BR2 .- TL2 .+ 1 ) - prod( BR1 .- TL1 .+ 1) )
     end
 end
 

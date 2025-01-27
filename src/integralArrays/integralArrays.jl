@@ -72,7 +72,7 @@ function integralArray!(
     I<:Real,
     N
 }
-     @assert size(intArr) == ( size(input) .+ 1 ); 
+     @assert size(intArr.arr) == ( size(input) .+ 1 ); 
      integralArray_unsafe!( intArr.arr, input, fun ); 
      return nothing    
 end
