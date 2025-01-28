@@ -3,6 +3,8 @@ module MarcIntegralArrays
 include("integralArrays/integralArrays.jl"); 
 include("integralArrays/integralArraysL2.jl"); 
 include("integralArrays/integralArraysL2M.jl"); 
+include("integralArrays/IntegralArrays_extra.jl");
+# include("integralArrays/IntegralVectorFields.jl")
 
 @inline  minmax( a::Int   , min::Int=1, max::Int=10 ) = a + (min-a)*Int(a<min) + (max-a)*Int(a>max)
 @inline  minmax( a::Dims{2}, min::Int, max::Dims{2} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ) )
@@ -15,9 +17,6 @@ include("integralSums/IntegralSum.jl");
 include("integralSums/IntegralSumN.jl"); 
 include("integralSums/IntegralSum_ring.jl");
 include("integralSums/IntegralSumN_ring.jl");
-
-
-include("integralArrays/IntegralArrays_extra.jl")
 
 # local filters implemented with integral arrays
 include("local_sum_operations.jl")
@@ -80,13 +79,8 @@ Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,2}, ry::UnitRange{Int}
 # intA[ 4:8, 4:9, 1:10 ] -> integral sum within the ROI ( 4:8, 5:9, 1:10 )
 Base.@propagate_inbounds Base.getindex(A::IntegralArray{T,3}, ry::UnitRange{Int}, rx::UnitRange{Int}, rz::UnitRange{Int}) where {T} = integralSum( A.arr, (ry.start,rx.start,rz.start), (ry.stop,rx.stop,rz.stop ))
 
-# super-specific class for performing integral dot products with vector fields
-# TODO: add explanation and examples
-include("integralArrays/IntegralVectorFields.jl")
-
-
 # multistep pipelines
-include("local_L2_segmentation.jl")
+# include("local_L2_segmentation.jl")
 
 end # module MarcIntegralArrays
 

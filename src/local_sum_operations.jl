@@ -383,6 +383,7 @@ function localsums_unsafe!( intArr::AbstractArray{T,N},
     return nothing
 end
 
+#=
 """
      Computes the local average around each position based on
     a rectangular ROI with half-size "rad". This function 
@@ -410,6 +411,7 @@ function localavg!( intArr::AbstractArray{T,2},
     end 
     return nothing
 end
+=#
 
 """
     This function is the holy grail for in-place localsums, as 

@@ -322,7 +322,7 @@ function localL2avg!(
         rad_in, 
         op=(out::T,n::T)->(out/n)
     )
-    localN_op!( 
+    localN!( 
         output, 
         rad_mid, 
         rad_out, 
