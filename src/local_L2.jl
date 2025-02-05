@@ -700,6 +700,19 @@ end
 
 function localL2avg_( 
     img::AbstractArray{T,N}, 
+    rad::Dims{N}
+) where {
+    T<:AbstractFloat,
+    N
+}
+    output = zeros( T, size(img) ); 
+    intAL2 = IntegralArraysL2( img )
+    localL2avg_!( output, img, intAL2, rad ) 
+    return output
+end
+
+function localL2avg_( 
+    img::AbstractArray{T,N}, 
     intAL2::IntegralArraysL2{T,N},
     rad::Dims{N}
 ) where {
