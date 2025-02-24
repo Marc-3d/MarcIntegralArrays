@@ -6,17 +6,44 @@
     In other words, from "the sum of squared pixel values within the square ROI (time 2N)" we substract "(2 times) the sum of pixel within the square ROI, squared". This quantity can be computed very efficiently with two integral arrays and in-place integral sums.    
 
 """
+
+# Real numbers and grayscale images
 function localL2avg( 
-    img::AbstractArray{T,N}, 
-    rad ::Dims{N}
+    img::AbstractArray{C,N}, 
+    rad::Dims{N}=Tuple(ones(Int,N)).*3; 
+    T::Type=Float64,
 ) where {
-    T,
+    C<:Union{Real,Color{<:Any,1}},
     N
 }
-   intAL2 = IntegralArraysL2( img )
-   out = localL2avg( intAL2, rad )
-   return out  
+    intAL2 = IntegralArraysL2( img, T )
+    out = localL2avg( intAL2, rad )
+    return out  
 end
+
+# Multi-channel images: RGB, HSV, ... 
+function localL2avg( 
+    img::AbstractArray{C,N}, 
+    rad::Dims{N}=Tuple(ones(Int,N)).*3; 
+    T::Type=Float64
+) where {
+    C<:Color{<:Any,3},
+    N
+}
+    intAL2 = IntegralArraysL2( img, T, field=1 )
+    out = localL2avg( intAL2, rad )
+    tmp = zeros( T, size( out ) ) 
+
+    for c in 2:3
+       tmp .= 0.0
+       integralArraysL2!( intAL2, img, c )
+       localL2avg!( tmp, intAL2, rad )
+       out .+= tmp
+    end
+    return out  
+end
+
+#-----------------------------
 
 function localL2avg( 
     intAL2::IntegralArraysL2{T,N},
@@ -120,18 +147,44 @@ end
 """
 
 function localL2avg( 
-    input::AbstractArray{T,N},
+    input::AbstractArray{C,N},
     rad_in::Dims{N},
     rad_out::Dims{N};
+    T::Type=Float64
 ) where {
-    T<:AbstractFloat,
+    C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input ); 
-    output = zeros( eltype( intAL2.IA.arr ),size( input ) ); 
+    intAL2 = IntegralArraysL2( input, T ); 
+    output = zeros( T,size( input ) ); 
     localL2avg!( output, intAL2, rad_in, rad_out )
     return output
 end
+
+function localL2avg( 
+    input::AbstractArray{C,N},
+    rad_in::Dims{N},
+    rad_out::Dims{N};
+    T::Type=Float64
+) where {
+    C<:Color{<:Any,3},
+    N
+}
+    intAL2 = IntegralArraysL2( input, T, field=1 )
+    output = zeros( T, size( input ) )
+    localL2avg!( output, intAL2, rad_in, rad_out )
+    
+    tmp = zeros( T, size( output ) ) 
+    for c in 2:3
+       tmp .= 0.0
+       integralArraysL2!( intAL2, input, c )
+       localL2avg!( tmp, intAL2, rad_in, rad_out )
+       output .+= tmp
+    end
+    return output  
+end
+
+#-----------------------------
 
 function localL2avg!( 
     output::AbstractArray{T,N},
@@ -204,23 +257,55 @@ function localL2avg!(
     return nothing
 end
 
-######
-
+"""
+    This function computes the "sum of all pairs of L2 differences" (like the function above) between an inner square ROI, and an outer ring-like ROI. The inner squre ROI is defined by a single "rad" parameters, while the outer ring-like ROI is defined by two "rad" parameters.  
+"""
 function localL2avg( 
-    input::AbstractArray{T,N},
+    input::AbstractArray{C,N},
     rad_in::Dims{N},
     rad_mid::Dims{N},
     rad_out::Dims{N};
+    T::Type=Float64
 ) where {
-    T<:AbstractFloat,
+    C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input ); 
-    output = zeros( eltype( intAL2.IA.arr ),size( input ) ); 
-    tmp    = zeros( eltype( intAL2.IA.arr ),size( input ) );
+    intAL2 = IntegralArraysL2( input, T ); 
+    output = zeros( T, size( input ) ); 
+    tmp    = zeros( T, size( input ) );
     localL2avg!( output, intAL2, tmp, rad_in, rad_mid, rad_out )
     return output 
 end
+
+function localL2avg( 
+    input::AbstractArray{C,N},
+    rad_in::Dims{N},
+    rad_mid::Dims{N},
+    rad_out::Dims{N};
+    T::Type=Float64
+) where {
+    C<:Color{<:Any,3},
+    N
+}
+    intAL2 = IntegralArraysL2( input, T ); 
+    output = zeros( T, size( input ) ); 
+    tmp1   = zeros( T, size( input ) );
+    tmp2   = zeros( T, size( input ) ); 
+    localL2avg!( output, intAL2, tmp1, rad_in, rad_mid, rad_out )
+
+    for c in 2:3
+       tmp1 .= 0.0
+       tmp2 .= 0.0
+       integralArraysL2!( intAL2, input, c )
+       localL2avg!( tmp1, intAL2, tmp2, rad_in, rad_mid, rad_out )
+       output .+= tmp1
+    end  
+
+    return output 
+end
+
+ 
+#--------------------------------
 
 function localL2avg!( 
     output::AbstractArray{T,N},

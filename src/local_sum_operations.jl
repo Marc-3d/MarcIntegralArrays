@@ -225,9 +225,9 @@ function localAvgs(
     T,
     N
 }
-    intA = integralArray( input )
+    intA = IntegralArray( input )
     output = zeros( T, size(input) )
-    localAvgs!( output, intA, rad, f=f, op=op )
+    localAvgs!( output, intA.arr, rad, f=f, op=op )
     return output
 end
 

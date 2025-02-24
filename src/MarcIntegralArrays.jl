@@ -1,9 +1,13 @@
 module MarcIntegralArrays
 
+using ColorTypes
+
 include("integralArrays/integralArrays.jl"); 
 include("integralArrays/integralArraysL2.jl"); 
 include("integralArrays/integralArraysL2M.jl"); 
 include("integralArrays/IntegralArrays_extra.jl");
+
+include("integralArrays/IntegralArrays_Colors.jl" )
 # include("integralArrays/IntegralVectorFields.jl")
 
 @inline  minmax( a::Int   , min::Int=1, max::Int=10 ) = a + (min-a)*Int(a<min) + (max-a)*Int(a>max)

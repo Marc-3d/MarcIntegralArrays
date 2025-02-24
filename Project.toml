@@ -2,3 +2,9 @@ name = "MarcIntegralArrays"
 uuid = "22adcb8d-38e9-4bca-bde9-f028a915c79c"
 authors = ["marc "]
 version = "0.1.0"
+
+[deps]
+ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+
+[compat]
+ColorTypes = "0.12.0"
