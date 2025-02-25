@@ -8,7 +8,7 @@ include("integralArrays/integralArraysL2M.jl");
 include("integralArrays/IntegralArrays_extra.jl");
 
 include("integralArrays/IntegralArrays_Colors.jl" )
-# include("integralArrays/IntegralVectorFields.jl")
+include("integralArrays/IntegralVectorFields.jl")
 
 @inline  minmax( a::Int   , min::Int=1, max::Int=10 ) = a + (min-a)*Int(a<min) + (max-a)*Int(a>max)
 @inline  minmax( a::Dims{2}, min::Int, max::Dims{2} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ) )

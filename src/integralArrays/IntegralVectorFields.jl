@@ -28,9 +28,15 @@ end
     intVF2D = IntegralVectorField( U, V )
     intVF3D = IntegralVectorField( U, V, W )
 """
-function IntegralVectorField( components::Vararg{AbstractArray{T,N}} ) where {T,N}
+function IntegralVectorField( 
+    components::Vararg{AbstractArray{R,N}}; 
+    T = Float64
+) where {
+    R <: Real,
+    N
+}
     M = compute_magnitude( components... )
-    integralVF = IntegralVectorField( getIntegralArray.(components), getIntegralArray(M) )
+    integralVF = IntegralVectorField( IntegralArray.(components, T), IntegralArray(M, T) )
     return integralVF
 end
 
@@ -47,8 +53,14 @@ ilength( IVF::IntegralVectorField{T,NC,1} )  where {T,NC} = length( IVF.magnitud
 """
     Average vectors
 """
-function averageVF( IVF::IntegralVectorField{T,NC,ND},
-                    rad::NTuple{ND,Int} ) where {T,NC,ND}
+function averageVF( 
+    IVF::IntegralVectorField{T,NC,ND},
+    rad::NTuple{ND,Int} 
+) where {
+    T,
+    NC,
+    ND
+}
     avgVF = zeros( T, NC, size(IVF)... )
     for c in CartesianIndices( size(IVF) )
         TLF,BRB = c.I .- rad, c.I .+ rad
@@ -63,9 +75,14 @@ end
     Collectiveness: 
         indot of vector at "p" with vectors around it.
 """
-function collectiveness( IVF::IntegralVectorField{T,NC,ND},
-                         rad::NTuple{ND,Int} ) where {T,NC,ND}
-
+function collectiveness( 
+    IVF::IntegralVectorField{T,NC,ND},
+    rad::NTuple{ND,Int} 
+) where {
+    T,
+    NC,
+    ND
+}
     out = zeros( T, size(IVF) )
     for c in CartesianIndices( out )
         score = T(0.0)
@@ -94,10 +111,15 @@ end
     ND: indot( IVF, ((2,3,4),(8,10,6)), ((3,5,1),(4,5,3)) ) -- ROI1 = (2:8,3:10,4:6), ROI2=(3:4,5:5,1:3)
     ND: indot( IVF, (2:8, 3:10, 4:6), (3:4, 5:5, 1:3) ) -- ROI1 = (2:8,3:10,4:6), ROI2=(3:4,5:5,1:3)
 """
-# TODO: implement the average integral dot product
-function indot( IVF::IntegralVectorField{T,NC,ND}, 
-                ROI1::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}},
-                ROI2::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}} ) where {T,NC,ND}
+function indot( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    ROI1::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}},
+    ROI2::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}} 
+) where {
+    T,
+    NC,
+    ND
+}
     indot = T(0.0)
     for i in 1:NC
         indot += IVF.components[i][ ROI1... ] * IVF.components[i][ ROI2... ]
@@ -106,9 +128,51 @@ function indot( IVF::IntegralVectorField{T,NC,ND},
     return indot
 end
 
-function indot( IVF::IntegralVectorField{T,NC,1}, 
-                ROI1::NTuple{2,Int},
-                ROI2::NTuple{2,Int} ) where {T,NC}
+function indots( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    radii::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    indots = zeros( T, size( IVF ) )
+    for c in CartesianIndices( size( IVF ) )
+        indots[c] = indot( IVF, (Tuple(c).-radii,Tuple(c).+radii), (Tuple(c).-radii,Tuple(c).+radii)  )
+    end
+    return indots
+end
+
+function indots( 
+    IVF::IntegralVectorField{T,NC,ND};
+    left_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    right_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    off_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    left_2::Dims{ND}=Tuple(zeros(Int,ND)),
+    right_2::Dims{ND}=Tuple(zeros(Int,ND)),
+    off_2::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    indots = zeros( T, size( IVF ) )
+    for c in CartesianIndices( size( IVF ) )
+        indots[c] = indot( IVF, (Tuple(c).+off_1.-left_1,Tuple(c).+off_1.+right_1), (Tuple(c).+off_2.-left_2,Tuple(c).+off_2.+right_2)  )
+    end
+    return indots
+end
+
+###
+
+function indot( 
+    IVF::IntegralVectorField{T,NC,1}, 
+    ROI1::NTuple{2,Int},
+    ROI2::NTuple{2,Int} 
+) where {
+    T,
+    NC
+}
     indot = T(0)
     for i in 1:NC
         indot += IVF.components[i][ ROI1... ] * IVF.components[i][ ROI2... ]
@@ -117,15 +181,78 @@ function indot( IVF::IntegralVectorField{T,NC,1},
     return indot
 end
 
-function indot( IVF::IntegralVectorField{T,NC,1}, 
-                ROI1::UnitRange,
-                ROI2::UnitRange ) where {T,NC}
+function indot( 
+    IVF::IntegralVectorField{T,NC,1}, 
+    ROI1::UnitRange,
+    ROI2::UnitRange 
+) where {
+    T,
+    NC
+}
     indot = T(0)
     for i in 1:NC
         indot += IVF.components[i][ ROI1 ] * IVF.components[i][ ROI2 ]
     end
     indot /= IVF.magnitudes[ ROI1 ] * IVF.magnitudes[ ROI2 ]
     return indot
+end
+
+
+"""
+    The function below computes the "integral normalized dot product" (indot, for short) between
+    one ROI of an `IntegralVectorField` and a reference vector. 
+"""
+function indot( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    ROI1::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}},
+    refV::NTuple{NC,T},
+    magV::T 
+) where {
+    T,
+    NC,
+    ND
+}
+    indot = T(0.0)
+    for i in 1:NC
+        indot += IVF.components[i][ ROI1... ] * refV[i]
+    end
+    indot /= IVF.magnitudes[ ROI1... ] * magV
+    return indot
+end
+
+function indots( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    refV::NTuple{NC,T},
+    radii::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    magV = sqrt( sum( refV .* refV ) )
+    indots = zeros( T, size( IVF ) )
+    for c in CartesianIndices( size( IVF ) )
+        indots[c] = indot( IVF, (Tuple(c).-radii,Tuple(c).+radii), refV, magV  )
+    end
+    return indots
+end
+
+function indots( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    refV::NTuple{NC,T};
+    left::Dims{ND}=Tuple(zeros(Int,ND)),
+    right::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    magV = sqrt( sum( refV .* refV ) )
+    indots = zeros( T, size( IVF ) )
+    for c in CartesianIndices( size( IVF ) )
+        indots[c] = indot( IVF, (Tuple(c).-left,Tuple(c).+right), refV, magV  )
+    end
+    return indots
 end
 
 ####################################
@@ -238,12 +365,17 @@ end
 
 #####
 
-function compute_magnitude( components::Vararg{AbstractArray{T,N}} ) where {T,N}
+function compute_magnitude( 
+    components::Vararg{AbstractArray{T,N}} 
+) where {
+    T,
+    N
+}
     M = zeros( T, size(components[1]) ); 
-    for i in 1:length(components)
+    @inbounds for i in 1:length(components)
         M .+= components[i] .^ 2 
     end
-    for i in 1:length(M)
+    @inbounds for i in 1:length(M)
         M[i] = sqrt( M[i] )
     end
     return M 

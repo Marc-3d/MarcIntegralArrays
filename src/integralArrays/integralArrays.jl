@@ -34,7 +34,7 @@ function IntegralArray(
     N
 }
     IA = IntegralArray( T, size(inp) .+ 1 )
-    integralArray!( IA, inp, (x)->(T(x)) )
+    integralArray!( IA, inp, (x)->(x) )
     return IA
 end
 
@@ -167,7 +167,15 @@ function integralArray_unsafe!(
     return nothing
 end
 
-# 3D: TODO: check, it might be wrong after I impulsively try to refactor it
+#= 3D: It seems to be correct. I tested it with this code, and by changing parameters. 
+
+    using MarcIntegralArrays
+    x = rand( Float64, (10,10,10) )
+    IA = marcIntegralArrays.IntegralArray( x ); 
+    TLF = ( 1, 1, 1 ); 
+    BRB = ( 3, 5, 2 );
+    println( x[ UnitRange.( TLF, BRB )... ], "\t", IA[ TLF, BRB ] )
+=#
 function integralArray_unsafe!( 
     intArr::AbstractArray{T,3},
     vol::AbstractArray{R,3},
