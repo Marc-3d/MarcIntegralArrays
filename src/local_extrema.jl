@@ -8,14 +8,15 @@ function local_extrema( img::Array{T,2},
 
     return local_extrema!( zeros(Bool,size(img)), 
                            zeros(Bool,size(img)),
-                           integralArray(img), rad,
+                           IntegralArray(img), 
+                           rad,
                            avg_th=avg_th, 
                            fmin=fmin, fmax=fmax, ovp=ovp, f=f );
 end
 
 function local_extrema!( minima::Array{Bool,2}, 
                          maxima::Array{Bool,2}, 
-                         intA::Array{T,2},
+                         intA::IntegralArray{T,2},
                          rad::Dims{2};
                          avg_th=0,
                          fmin=1, fmax=1, 
@@ -36,7 +37,7 @@ function local_extrema!( minima::Array{Bool,2},
         BR = clipmax.( ( y,x ) .+ rad, isize );
         NN = prod( BR .- TL .+ 1 ); 
         
-        sum = integralSum_unsafe( intA, TL, BR );
+        sum = integralSum_unsafe( intA.arr, TL, BR );
         avg = sum/NN 
              
         ( avg <= avg_th ) && ( continue; )
@@ -44,7 +45,7 @@ function local_extrema!( minima::Array{Bool,2},
         idx = 1;
         for xoff in -1:1, yoff in -1:1
             off = ystep .* yoff .+ xstep .* xoff; 
-            sums9[idx] = integralSum( intA, TL .+ off, BR .+ off ); 
+            sums9[idx] = integralSum( intA.arr, TL .+ off, BR .+ off ); 
             signs[idx] = sign( sum*f - sums9[idx] ); 
             idx += 1;   
         end

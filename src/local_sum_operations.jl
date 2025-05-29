@@ -5,14 +5,15 @@
 
 function localsums( 
     input::AbstractArray{T,N}, 
-    rad::Dims{N} 
+    rad::Dims{N},
+    dtype = Float32 
 ) where {
-    T<:AbstractFloat,
+    T<:Real,
     N
 }
-    output = zeros( T, size(input));
-    intA   = integralArray( input ); 
-    localsums!( intA, output, rad );
+    output = zeros( dtype, size(input));
+    intA   = IntegralArray( input, dtype=dtype ); 
+    localsums!( output, intA.arr, rad );
     return output;
 end
 

@@ -27,6 +27,8 @@ include("local_sum_operations.jl")
 include("local_extrema.jl")
 include("local_L2.jl");
 
+include( "integralFilters/localSTD.jl" )
+
 export integralArray, getIntegralArray
 
 

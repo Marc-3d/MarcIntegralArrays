@@ -143,7 +143,7 @@ function indots(
     return indots
 end
 
-function indots( 
+function indots_( 
     IVF::IntegralVectorField{T,NC,ND};
     left_1::Dims{ND}=Tuple(zeros(Int,ND)),
     right_1::Dims{ND}=Tuple(zeros(Int,ND)),
@@ -158,7 +158,11 @@ function indots(
 }
     indots = zeros( T, size( IVF ) )
     for c in CartesianIndices( size( IVF ) )
-        indots[c] = indot( IVF, (Tuple(c).+off_1.-left_1,Tuple(c).+off_1.+right_1), (Tuple(c).+off_2.-left_2,Tuple(c).+off_2.+right_2)  )
+        indots[c] = indot( 
+            IVF, 
+            (Tuple(c).+off_1.-left_1,Tuple(c).+off_1.+right_1), 
+            (Tuple(c).+off_2.-left_2,Tuple(c).+off_2.+right_2)  
+        )
     end
     return indots
 end
@@ -237,7 +241,7 @@ function indots(
     return indots
 end
 
-function indots( 
+function indots_( 
     IVF::IntegralVectorField{T,NC,ND}, 
     refV::NTuple{NC,T};
     left::Dims{ND}=Tuple(zeros(Int,ND)),
