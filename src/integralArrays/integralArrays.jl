@@ -27,14 +27,15 @@ end
     IA = MarcIntegralArrays.IntegralArray( input, Float32 ) 
 """
 function IntegralArray( 
-    inp::AbstractArray{R,N},
-    T = Float64
+    inp::AbstractArray{R,N};
+    T = Float64, 
+    fun = (x)->(x)
 ) where {
     R<:Real,
     N
 }
     IA = IntegralArray( T, size(inp) .+ 1 )
-    integralArray!( IA, inp, (x)->(x) )
+    integralArray!( IA, inp, fun )
     return IA
 end
 

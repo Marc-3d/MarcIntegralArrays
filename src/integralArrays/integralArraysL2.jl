@@ -22,7 +22,7 @@ end
 
 # contructor from input data
 function IntegralArraysL2( 
-    inp::AbstractArray{C,N},
+    inp::AbstractArray{C,N};
     T=Float64
 ) where {
     C<:Union{Real,Color{<:Any,1}},
@@ -46,15 +46,15 @@ function integralArraysL2!(
     N
 }
     integralArray!( IAL2.IA , inp )
-    integralArray!( IAL2.IA2, inp, (x)->(T(x)^2) )
+    integralArray!( IAL2.IA2, inp, (x)->(x^2) )
     return nothing
 end
 
 # contructor from input data
 function IntegralArraysL2( 
-    inp::AbstractArray{C,N},
-    T::Type=Float64;
-    field::Int=1
+    inp::AbstractArray{C,N};
+    T::Type=Float64,
+    channel::Int=1
 ) where {
     C<:Color{<:Any,3},
     N
@@ -62,7 +62,7 @@ function IntegralArraysL2(
     # initializing the integral arrays within IAL2
     IAL2 = IntegralArraysL2( T, size(inp) .+ 1 )
     # populating the integral arrays within IAL2
-    integralArraysL2!( IAL2, inp, field )
+    integralArraysL2!( IAL2, inp, channel=channel )
 
     return IAL2
 end
@@ -70,14 +70,14 @@ end
 # in-place computation of the two integral arrays 
 function integralArraysL2!( 
     IAL2::IntegralArraysL2{T,N}, 
-    inp::AbstractArray{C,N},
-    field::Int=1 
+    inp::AbstractArray{C,N};
+    channel::Int=1 
 ) where {
     T<:AbstractFloat,
     C<:Color{<:Any,3},
     N
 }
-    integralArray!( IAL2.IA , inp, (x)->(x), field )
-    integralArray!( IAL2.IA2, inp, (x)->(x^2), field  )
+    integralArray!( IAL2.IA , inp, fun=(x)->(x), channel=channel )
+    integralArray!( IAL2.IA2, inp, fun=(x)->(x^2), channel=channel  )
     return nothing
 end

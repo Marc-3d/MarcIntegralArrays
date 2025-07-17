@@ -16,26 +16,28 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( img, T )
-    out = localL2avg( intAL2, rad, average=average )
+    intAL2 = IntegralArraysL2( img, T=T )
+    out    = localL2avg( intAL2, rad, average=average )
     return out  
 end
 
 # Multi-channel images: RGB, HSV, ... 
 function localL2avg( 
     img::AbstractArray{C,N}, 
-    rad::Dims{N}=Tuple(ones(Int,N)).*3; 
-    T::Type=Float64, 
-    average=true
+    rad::Dims{N}=Tuple(ones(Int,N)).*3;
+    channels=collect(1:3), 
+    T::Type=Float64,
+    avearge=true
 ) where {
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( img, T, field=1, average )
+    intAL2 = IntegralArraysL2( img, T=T, channel=channels[1] )
     out = localL2avg( intAL2, rad, average=average )
     tmp = zeros( T, size( out ) ) 
 
-    for c in 2:3
+    for i in 2:3
+       c = channels[i]
        tmp .= 0.0
        integralArraysL2!( intAL2, img, c )
        localL2avg!( tmp, intAL2, rad, average=average )
@@ -119,7 +121,7 @@ function _localL2avg!(
     T<:AbstractFloat,
     N
 }
-    # 1-. output = -2 .* sum( IA )²
+    # 1-. output = - 2 .* sum( IA )²
     localsums!( 
         output, 
         intA, 
@@ -165,7 +167,7 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input, T ); 
+    intAL2 = IntegralArraysL2( input, T=T ); 
     output = zeros( T,size( input ) ); 
     localL2avg!( output, intAL2, rad_in, rad_out, average=average )
     return output
@@ -175,18 +177,20 @@ function localL2avg(
     input::AbstractArray{C,N},
     rad_in::Dims{N},
     rad_out::Dims{N};
+    channels=collect(1:N), 
     T::Type=Float64,
     average=true
 ) where {
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( input, T, field=1 )
+    intAL2 = IntegralArraysL2( input, T=T, channel=channels[1] )
     output = zeros( T, size( input ) )
     localL2avg!( output, intAL2, rad_in, rad_out, average=average )
     
     tmp = zeros( T, size( output ) ) 
-    for c in 2:3
+    for i in 2:length(channels)
+       c = channels[i]
        tmp .= 0.0
        integralArraysL2!( intAL2, input, c )
        localL2avg!( tmp, intAL2, rad_in, rad_out, average=average )
@@ -222,11 +226,11 @@ function localL2avg!(
     T<:AbstractFloat,
     N
 }
-    localL2avg!( output, intA.arr, intA2.arr, rad_in, rad_out, average=average )
+    _localL2avg!( output, intA.arr, intA2.arr, rad_in, rad_out, average=average )
     return nothing
 end
 
-function localL2avg!( 
+function _localL2avg!( 
     output::AbstractArray{T,N},
     intA::AbstractArray{T,N},
     intA2::AbstractArray{T,N},
@@ -289,7 +293,7 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input, T ); 
+    intAL2 = IntegralArraysL2( input, T=T ); 
     output = zeros( T, size( input ) ); 
     tmp    = zeros( T, size( input ) );
     localL2avg!( output, intAL2, tmp, rad_in, rad_mid, rad_out, average=average )
@@ -301,22 +305,24 @@ function localL2avg(
     rad_in::Dims{N},
     rad_mid::Dims{N},
     rad_out::Dims{N};
-    T::Type=Float64, 
+    channels=collect(1:N),
+    T::Type=Float64,
     average=true
 ) where {
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( input, T ); 
+    intAL2 = IntegralArraysL2( input, T=T, channel=channels[1] ); 
     output = zeros( T, size( input ) ); 
     tmp1   = zeros( T, size( input ) );
     tmp2   = zeros( T, size( input ) ); 
     localL2avg!( output, intAL2, tmp1, rad_in, rad_mid, rad_out, average=average )
 
-    for c in 2:3
+    for i in 2:length(channels)
+       c = channels[i]
        tmp1 .= 0.0
        tmp2 .= 0.0
-       integralArraysL2!( intAL2, input, c )
+       integralArraysL2!( intAL2, input, channel=c )
        localL2avg!( tmp1, intAL2, tmp2, rad_in, rad_mid, rad_out, average=average )
        output .+= tmp1
     end  
@@ -569,7 +575,6 @@ function localL2avg_!(
     return nothing
 end
 
-################################                       
 
 """   
 """

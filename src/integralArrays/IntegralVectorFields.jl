@@ -147,7 +147,7 @@ function indots(
     return indots
 end
 
-function indots( 
+function indots_( 
     IVF::IntegralVectorField{T,NC,ND};
     left_1::Dims{ND}=Tuple(zeros(Int,ND)),
     right_1::Dims{ND}=Tuple(zeros(Int,ND)),
@@ -272,7 +272,7 @@ function indots(
     return indots
 end
 
-function indots( 
+function indots_( 
     IVF::IntegralVectorField{T,NC,ND}, 
     refV::NTuple{NC,T}, 
     magV=sqrt(sum(refV.*refV));
