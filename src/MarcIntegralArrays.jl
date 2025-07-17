@@ -10,6 +10,7 @@ include("integralArrays/IntegralArrays_extra.jl");
 include("integralArrays/IntegralArrays_Colors.jl" )
 include("integralArrays/IntegralVectorFields.jl")
 
+# minmax isn't faster than max.( size(data), min.( 1, ... ) )
 @inline  minmax( a::Int   , min::Int=1, max::Int=10 ) = a + (min-a)*Int(a<min) + (max-a)*Int(a>max)
 @inline  minmax( a::Dims{2}, min::Int, max::Dims{2} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ) )
 @inline  minmax( a::Dims{3}, min::Int, max::Dims{3} ) = ( minmax( a[1], min, max[1] ), minmax( a[2], min, max[2] ), minmax( a[3], min, max[3] ) )

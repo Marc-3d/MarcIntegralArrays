@@ -28,13 +28,13 @@ end
 """
 function IntegralArray( 
     inp::AbstractArray{R,N};
-    dtype = Float64, 
+    T = Float64, 
     fun = (x)->(x)
 ) where {
     R<:Real,
     N
 }
-    IA = IntegralArray( dtype, size(inp) .+ 1 )
+    IA = IntegralArray( T, size(inp) .+ 1 )
     integralArray!( IA, inp, fun )
     return IA
 end

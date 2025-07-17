@@ -16,8 +16,8 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( img, T )
-    out = localL2avg( intAL2, rad )
+    intAL2 = IntegralArraysL2( img, T=T )
+    out    = localL2avg( intAL2, rad )
     return out  
 end
 
@@ -25,17 +25,17 @@ end
 function localL2avg( 
     img::AbstractArray{C,N}, 
     rad::Dims{N}=Tuple(ones(Int,N)).*3;
-    channels=collect(1:N), 
+    channels=collect(1:3), 
     T::Type=Float64
 ) where {
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( img, T, field=channels[1] )
+    intAL2 = IntegralArraysL2( img, T=T, channel=channels[1] )
     out = localL2avg( intAL2, rad )
     tmp = zeros( T, size( out ) ) 
 
-    for i in 2:length(channels)
+    for i in 2:3
        c = channels[i]
        tmp .= 0.0
        integralArraysL2!( intAL2, img, c )
@@ -157,7 +157,7 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input, T ); 
+    intAL2 = IntegralArraysL2( input, T=T ); 
     output = zeros( T,size( input ) ); 
     localL2avg!( output, intAL2, rad_in, rad_out )
     return output
@@ -173,7 +173,7 @@ function localL2avg(
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( input, T, field=channels[1] )
+    intAL2 = IntegralArraysL2( input, T=T, channel=channels[1] )
     output = zeros( T, size( input ) )
     localL2avg!( output, intAL2, rad_in, rad_out )
     
@@ -274,7 +274,7 @@ function localL2avg(
     C<:Union{Real,Color{<:Any,1}},
     N
 }
-    intAL2 = IntegralArraysL2( input, T ); 
+    intAL2 = IntegralArraysL2( input, T=T ); 
     output = zeros( T, size( input ) ); 
     tmp    = zeros( T, size( input ) );
     localL2avg!( output, intAL2, tmp, rad_in, rad_mid, rad_out )
@@ -292,7 +292,7 @@ function localL2avg(
     C<:Color{<:Any,3},
     N
 }
-    intAL2 = IntegralArraysL2( input, T, field=channels[1] ); 
+    intAL2 = IntegralArraysL2( input, T=T, channel=channels[1] ); 
     output = zeros( T, size( input ) ); 
     tmp1   = zeros( T, size( input ) );
     tmp2   = zeros( T, size( input ) ); 
@@ -302,7 +302,7 @@ function localL2avg(
        c = channels[i]
        tmp1 .= 0.0
        tmp2 .= 0.0
-       integralArraysL2!( intAL2, input, c )
+       integralArraysL2!( intAL2, input, channel=c )
        localL2avg!( tmp1, intAL2, tmp2, rad_in, rad_mid, rad_out )
        output .+= tmp1
     end  

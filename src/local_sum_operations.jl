@@ -4,37 +4,84 @@
 ##### BOUND-SAFE LOCAL SUMS
 
 function localsums( 
-    input::AbstractArray{T,N}, 
-    rad::Dims{N},
-    dtype = Float32 
+    input::AbstractArray{C,N}, 
+    rad::Union{Dims{N},AbstractArray{Int,N}};
+    T = Float64 
 ) where {
-    T<:Real,
+    C<:Union{Real,Color{<:Any,1}},
     N
 }
-    output = zeros( dtype, size(input));
-    intA   = IntegralArray( input, dtype=dtype ); 
+    output = zeros( T, size(input));
+    intA   = IntegralArray( input, T=T ); 
     localsums!( output, intA.arr, rad );
     return output;
 end
 
-#= 
-using BenchmarkTools, MarcIntegralArrays
+function localsums( 
+    input::AbstractArray{C,N}, 
+    rad::Dims{N};
+    channels=collect(1:3),
+    T = Float64 
+) where {
+    C<:Color{<:Any,3},
+    N
+}
+    output = zeros( T, size(input)..., 3 );
+    intA   = IntegralArray( input, T=T );
+    NN     = prod( 2 .* rad .+ 1 ) 
+    out_v  = view( output, :, :, 1 )
+    localsums!( out_v, intA.arr, rad );
 
-#1D
-N = 100; T = Float32; IA = rand( T, N+1 ); output = zeros( T, N ); rad = (5,); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
-  ~ 250 ns (AMD EPYC 7453)
+    for i in 2:3
+        c = channels[i]
+        integralArray!( intA, input, channel=c ); 
+        out_v = view( output, :, :, c )
+        localsums!( out_v, intA.arr, rad )
+    end
+    output ./= NN
 
-# 2D
-Ny, Nx = 100, 100; T = Float32; IA = rand( T, Ny+1, Nx+1 ); output = zeros( T, Ny, Nx ); rad = (5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
-  ~ 70.600 μs (AMD EPYC 7453)
+    return float2RGB( output );
+end
 
-# 3D
-Ny, Nx, Nz = 20, 20, 20; T = Float32; IA = rand( T, Ny+1, Nx+1, Nz+1 ); output = zeros( T, Ny, Nx, Nz ); rad = (5,5,5); f = Float32(1); op = (o::Float32,i::Float32)->(i)::Float32;
-@btime MarcIntegralArrays.localsums!( $IA, $output, $rad, f=$f, op=$op )
-   ~ 88 μs (AMD EPYC 7453)
-=#
+function localsums( 
+    input::AbstractArray{C,N}, 
+    rad::AbstractArray{Int,N};
+    channels=collect(1:3),
+    T = Float64 
+) where {
+    C<:Color{<:Any,3},
+    N
+}
+    output = zeros( T, size(input)..., 3 );
+    intA   = IntegralArray( input, T=T );
+    NN     = prod( 2 .* rad .+ 1 ) 
+    out_v  = view( output, :, :, 1 )
+    localsums!( out_v, intA.arr, rad );
+
+    for i in 2:3
+        c = channels[i]
+        integralArray!( intA, input, channel=c ); 
+        out_v  = view( output, :, :, c )
+        localsums!( out_v, intA.arr, rad )
+    end
+    # TOOD: hard-corded for 2D at the moment
+    for c in CartesianIndices( input )
+        output[Tuple(c)...,:] ./= prod( 2 .* (rad[c],rad[c]) .+ 1 )
+    end
+
+    return float2RGB( output );
+end
+
+function float2RGB( inp::Array{T,3} ) where {T}
+    out = zeros( RGB{T}, size(inp)[1:2] )
+    for c in CartesianIndices( out )
+       out[c] = RGB{T}( inp[Tuple(c)...,:]... )
+    end;
+    return out
+end
+
+
+
 """ 
     Computes in-place local sums for each coordinate, p, of the input data. These local sums are computed from the local rectangular ROI around each coordiante, p, given by `UnitRange.( p.-rad, p.+rad )`.
 """
@@ -43,7 +90,7 @@ function localsums!(
     intArr::AbstractArray{T,N},
     rad::Dims{N};
     f::T=T(1),
-    op::Function=(out::T,in::T)->(out+in)::T
+    op::Function=(out::T,in::T)->(in)
 ) where {
     T,
     N
@@ -59,6 +106,32 @@ function localsums!(
     end 
     return nothing
 end
+
+
+function localsums!( 
+    output::AbstractArray{T,N},
+    intArr::AbstractArray{T,N},
+    rad::AbstractArray{Int,N};
+    f::T=T(1),
+    op::Function=(out::T,in::T)->(in)
+) where {
+    T,
+    N
+}
+    @inbounds for c in CartesianIndices( output )
+        tmp = integralSum( 
+            intArr, 
+            # TODO: hard-coded for 2D at the moment. the "rad" tuple should have N elements.
+            Tuple(c) .- (rad[c],rad[c]), 
+            Tuple(c) .+ (rad[c],rad[c]),
+            f 
+        )
+        output[ c ] = op( output[c], tmp ); 
+    end 
+    return nothing
+end
+
+
 
 #= 
 using BenchmarkTools, MarcIntegralArrays
