@@ -25,7 +25,9 @@ include("integralSums/IntegralSumN_ring.jl");
 # local filters implemented with integral arrays
 include("local_sum_operations.jl")
 include("local_extrema.jl")
+
 include("local_L2.jl");
+include("integralFilters/local_L2_masked.jl")
 
 export integralArray, getIntegralArray
 

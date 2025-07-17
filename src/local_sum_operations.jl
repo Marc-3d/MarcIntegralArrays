@@ -257,18 +257,19 @@ function localAvgs!(
 end
 
 function localAvgs( 
-    input::AbstractArray{T,N},
+    input::AbstractArray{R,N},
     rad1::Dims{N},
     rad2::Dims{N};
-    f::T=T(1),
-    op::Function=(out::T,in::T)->(out+in)::T
+    T=Float64,
+    f=T(1),
+    op::Function=(out,in)->(out+in)
 ) where {
-    T,
+    R<:Real,
     N
 }
-    intA = integralArray( input )
+    intA = IntegralArray( input, T )
     output = zeros( T, size(input) )
-    localAvgs!( output, intA, rad1, rad2, f=f, op=op )
+    localAvgs!( output, intA.arr, rad1, rad2, f=f, op=op )
     return output
 end
 

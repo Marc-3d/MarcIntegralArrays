@@ -52,6 +52,9 @@ ilength( IVF::IntegralVectorField{T,NC,1} )  where {T,NC} = length( IVF.magnitud
 
 """
     Average vectors
+
+    input < IntegralVectorField( U, V[, W ] )
+    output > Array( #Components, size_vectorfield... )
 """
 function averageVF( 
     IVF::IntegralVectorField{T,NC,ND},
@@ -76,7 +79,7 @@ end
         indot of vector at "p" with vectors around it.
 """
 function collectiveness( 
-    IVF::IntegralVectorField{T,NC,ND},
+    IVF::IntegralVectorField{T,NC,ND};
     rad::NTuple{ND,Int} 
 ) where {
     T,
@@ -85,16 +88,17 @@ function collectiveness(
 }
     out = zeros( T, size(IVF) )
     for c in CartesianIndices( out )
-        score = T(0.0)
         TLF,BRB = c.I .- rad, c.I .+ rad
-        for i in 1:NC
-            s1 = IVF.components[i][ c.I, c.I ] 
-            s2 = IVF.components[i][ TLF, BRB ] - s1
-            score += s1 * s2
-        end
-        m1 = IVF.magnitudes[ c.I, c.I ]
-        m2 = IVF.magnitudes[ TLF, BRB ] - m1
-        out[ c ] = ( score )/( m1 * m2 )
+        ndot = indot( IVF, UnitRange.( c.I, c.I ), UnitRange.( TLF, BRB ) ); 
+        score = T(0.0)
+        # for i in 1:NC
+        #     s1 = IVF.components[i][ c.I, c.I ] 
+        #     s2 = IVF.components[i][ TLF, BRB ] - s1
+        #     score += s1 * s2
+        # end
+        # m1 = IVF.magnitudes[ c.I, c.I ]
+        # m2 = IVF.magnitudes[ TLF, BRB ] - m1
+        out[ c ] = ndot # ( score )/( m1 * m2 )
     end
     return out
 end
@@ -157,10 +161,41 @@ function indots(
     ND
 }
     indots = zeros( T, size( IVF ) )
-    for c in CartesianIndices( size( IVF ) )
-        indots[c] = indot( IVF, (Tuple(c).+off_1.-left_1,Tuple(c).+off_1.+right_1), (Tuple(c).+off_2.-left_2,Tuple(c).+off_2.+right_2)  )
-    end
+    indots!( 
+        indots,
+        IVF,
+        left_1=left_1,
+        right_1=right_1,
+        off_1=off_1,
+        left_2=left_2,
+        right_2=right_2,
+        off_2=off_2
+    )
     return indots
+end
+
+function indots!( 
+    out::AbstractArray{T,ND},
+    IVF::IntegralVectorField{T,NC,ND};
+    left_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    right_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    off_1::Dims{ND}=Tuple(zeros(Int,ND)),
+    left_2::Dims{ND}=Tuple(zeros(Int,ND)),
+    right_2::Dims{ND}=Tuple(zeros(Int,ND)),
+    off_2::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    for c in CartesianIndices( size( IVF ) )
+        out[c] = indot( 
+            IVF, 
+            (Tuple(c).+off_1.+left_1,Tuple(c).+off_1.+right_1), 
+            (Tuple(c).+off_2.+left_2,Tuple(c).+off_2.+right_2)  
+        )
+    end
+    return nothing
 end
 
 ###
@@ -239,7 +274,8 @@ end
 
 function indots( 
     IVF::IntegralVectorField{T,NC,ND}, 
-    refV::NTuple{NC,T};
+    refV::NTuple{NC,T}, 
+    magV=sqrt(sum(refV.*refV));
     left::Dims{ND}=Tuple(zeros(Int,ND)),
     right::Dims{ND}=Tuple(zeros(Int,ND))
 ) where {
@@ -247,13 +283,66 @@ function indots(
     NC,
     ND
 }
-    magV = sqrt( sum( refV .* refV ) )
+    indots = zeros( T, size( IVF ) )
+    indots!( 
+        indots, 
+        IVF, 
+        refV, 
+        magV,
+        left=left, 
+        right=right
+    )
+    return indots
+end
+
+
+function indots!( 
+    out::AbstractArray{T,ND},
+    IVF::IntegralVectorField{T,NC,ND}, 
+    refV::NTuple{NC,T}, 
+    magV=sqrt(sum(refV .*refV) );
+    left::Dims{ND}=Tuple(zeros(Int,ND)),
+    right::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
+    for c in CartesianIndices( size( IVF ) )
+        out[c] = indot( IVF, (Tuple(c).+left,Tuple(c).+right), refV, magV  )
+    end
+    return nothing
+end
+
+###
+
+function inmags( 
+    IVF::IntegralVectorField{T,NC,ND}, 
+    ROI1::Union{NTuple{2,NTuple{ND,Int}},NTuple{ND,UnitRange}},
+) where {
+    T,
+    NC,
+    ND
+}
+    return IVF.magnitudes[ ROI1... ]
+end
+
+function inmags( 
+    IVF::IntegralVectorField{T,NC,ND};
+    left::Dims{ND}=Tuple(zeros(Int,ND)),
+    right::Dims{ND}=Tuple(zeros(Int,ND))
+) where {
+    T,
+    NC,
+    ND
+}
     indots = zeros( T, size( IVF ) )
     for c in CartesianIndices( size( IVF ) )
-        indots[c] = indot( IVF, (Tuple(c).-left,Tuple(c).+right), refV, magV  )
+        indots[c] = inmags( IVF, (Tuple(c).+left,Tuple(c).+right)  )
     end
     return indots
 end
+
 
 ####################################
 

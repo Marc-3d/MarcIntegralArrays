@@ -16,7 +16,7 @@ function IntegralArraysL2M(
     N
 }
     return IntegralArraysL2M{type,N}( 
-        IntegralArray( type, size ), 
+        IntegralArray( type, size ),
         IntegralArray( type, size ),
         IntegralArray( type, size ),
     )
@@ -28,16 +28,16 @@ function IntegralArraysL2M(
     mask::AbstractArray{U,N},
     T=Float64
 ) where {
-    I<:Real,
-    U<:Integer,
+    I<:Union{Real,Color{<:Any,1}},
+    U<:Real,
     N
 }
     # initializing the integral arrays within IAL2
-    IAL2 = IntegralArraysL2M( T, size(inp) .+ 1 )
+    IAL2M = IntegralArraysL2M( T, size(inp) .+ 1 )
     # populating the integral arrays within IAL2
-    integralArraysL2M!( IAL2, inp, mask )
+    integralArraysL2M!( IAL2M, inp, mask )
 
-    return IAL2
+    return IAL2M
 end
 
 # in-place computation of the two integral arrays 
@@ -47,12 +47,12 @@ function integralArraysL2M!(
     mask::AbstractArray{U,N}
 ) where {
     T<:AbstractFloat,
-    I<:Real,
-    U<:Integer,
+    I<:Union{Real,Color{<:Any,1}},
+    U<:Real,
     N
 }
     integralArray!( IAL2M.IA , inp )
-    integralArray!( IAL2M.IA2, inp, (x)->(T(x)^2) )
+    integralArray!( IAL2M.IA2, inp, (x)->(x^2) )
     integralArray!( IAL2M.IAM, mask )
     return nothing
 end
