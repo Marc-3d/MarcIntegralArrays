@@ -2,7 +2,8 @@ module MarcIntegralArrays
 
 using ColorTypes
 
-include("integralArrays/integralArrays.jl"); 
+include("integralArrays/integralArrays.jl");
+include("integralArrays/integralArraysM.jl"); 
 include("integralArrays/integralArraysL2.jl"); 
 include("integralArrays/integralArraysL2M.jl"); 
 include("integralArrays/IntegralArrays_extra.jl");
@@ -19,17 +20,30 @@ include("integralArrays/IntegralVectorFields.jl")
 @inline clipmax( a::Int, max::Int=1 ) = a + (max-a)*Int(a>max) 
 
 include("integralSums/IntegralSum.jl");
-include("integralSums/IntegralSumN.jl"); 
 include("integralSums/IntegralSum_ring.jl");
+
+include("integralSums/IntegralSumN.jl"); 
 include("integralSums/IntegralSumN_ring.jl");
 
+include("integralSums/IntegralAvg.jl"); 
+include("integralSums/IntegralAvg_ring.jl");
+
 # local filters implemented with integral arrays
-include("local_sum_operations.jl")
+include("localSums/localSums.jl")
+include("localSums/localSums_ring.jl")
+include("localSums/localSumsN.jl")
+
+include("localSums/localAvgs.jl")
+include("localSums/localAvgs_ring.jl")
+include("localSums/localAvgs_masked.jl")
+
+include("localSums/local_sum_operations.jl")
+
+
 include("local_extrema.jl")
 
-include("local_L2.jl");
+include("integralFilters/local_L2.jl");
 include("integralFilters/local_L2_masked.jl")
-
 include( "integralFilters/localSTD.jl" )
 
 export integralArray, getIntegralArray

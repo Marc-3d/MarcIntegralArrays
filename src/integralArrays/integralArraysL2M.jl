@@ -1,6 +1,8 @@
 
 """
-    Integral arrays for integral masked squarred errors
+    Integral arrays for integral masked squarred errors.
+
+    The input is assumed to be masked. That is, all elements outside the mask are set to 0. 
 """
 mutable struct IntegralArraysL2M{T,N}
     IA::IntegralArray{T,N}
